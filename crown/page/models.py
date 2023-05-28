@@ -1,9 +1,10 @@
 from django.db import models
+from django.db.models.signals import post_save
 
-from user.models import User
+from crown.models import AbstractAuthorsObj
 
 
-class Page(models.Model):
+class Page(AbstractAuthorsObj):
     """Страница"""
     title = models.CharField(max_length=150,
                              verbose_name="Название",
@@ -14,9 +15,6 @@ class Page(models.Model):
                                verbose_name="Родительская страница",
                                default=None,
                                related_name="subpages")
-    author = models.ForeignKey(User,
-                               on_delete=models.CASCADE,
-                               verbose_name="Автор")
 
     class Meta:
         verbose_name = "Страница"
@@ -24,3 +22,13 @@ class Page(models.Model):
 
     def __str__(self):
         return '{}'.format(self.id)
+
+    @classmethod
+    def post_create(cls, sender, instance, created, *args, **kwargs):
+        """При создании новой Страницы создает для неё Дорогу"""
+        if created:
+            from road.models import Road
+            Road.objects.create(author=instance.author, page=instance, is_public=instance.is_public)
+
+
+post_save.connect(Page.post_create, sender=Page)

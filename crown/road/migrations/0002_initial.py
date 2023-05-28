@@ -10,19 +10,25 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('page', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+        ('road', '0001_initial'),
+        ('page', '0002_initial'),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='page',
+            model_name='road',
             name='author',
             field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL, verbose_name='Автор'),
         ),
         migrations.AddField(
-            model_name='page',
+            model_name='road',
+            name='page',
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='page.page', verbose_name='Страница'),
+        ),
+        migrations.AddField(
+            model_name='road',
             name='parent',
-            field=models.ForeignKey(blank=True, default=None, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='subpages', to='page.page', verbose_name='Родительская страница'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='subroad', to='road.road', verbose_name='Дорога, от которой пошла развилка'),
         ),
     ]

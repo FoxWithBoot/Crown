@@ -1,9 +1,10 @@
 from django.db import models
 
 from page.models import Page
+from crown.models import AbstractAuthorsObj
 
 
-class Road(models.Model):
+class Road(AbstractAuthorsObj):
     """Дорога на странице"""
     page = models.ForeignKey(Page,
                              on_delete=models.CASCADE,
