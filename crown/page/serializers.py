@@ -3,6 +3,8 @@ from rest_framework import serializers
 from .models import Page
 from user.serializers import UserShortSerializer
 
+from .validators import check_public_or_author
+
 
 class CreatePageSerializer(serializers.ModelSerializer):
     """Сериализатор для создания новой страницы"""
@@ -14,10 +16,8 @@ class CreatePageSerializer(serializers.ModelSerializer):
         return Page.objects.create(**validated_data)
 
     def validate_parent(self, value):
-        """Проверка на то, что родительская страница либо опубликована, либо принадлежит пользователю"""
-        if value:
-            if not value.is_public and value.author != self.context['user']:
-                raise serializers.ValidationError("Попытка доступа к чужой приватной странице")
+        if not check_public_or_author(self.context['user'], value):
+            raise serializers.ValidationError("Попытка доступа к чужой приватной странице")
         return value
 
 
