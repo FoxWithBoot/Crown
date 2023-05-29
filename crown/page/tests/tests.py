@@ -63,3 +63,18 @@ class TestPage(APITestCase):
         else:
             assert Page.objects.count() == self.count
             assert Road.objects.count() == self.count
+
+    @parameterized.expand([
+        (None, 5, 200, '{"id":5,"author":{"id":2,"username":"User1"},"is_public":true,"title":"Page_4","parent":null}'),
+        (None, 1, 401, '{"detail":"Учетные данные не были предоставлены."}'),
+        ('User2', 1, 403, '{"detail":"Доступ разрешен только автору."}'),
+        ('User0', 1, 200, '{"id":1,"author":{"id":1,"username":"User0"},"is_public":false,"title":"Page_0","parent":null}'),
+        ('User0', 10, 404, '{"detail":"Страница не найдена."}'),
+    ])
+    def test_get_page_info(self, username, page_id, status, resp):
+        if username:
+            self.login(username)
+        response = self.client.get(self.url+str(page_id)+'/', format='json')
+        print(response)
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp

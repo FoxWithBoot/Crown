@@ -11,24 +11,33 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Page
-from .permissions import OnlyAuthorOrReadOnly
+from .permissions import OnlyAuthorIfPrivate
 from .serializers import CreatePageSerializer, PageSerializer, ShortPageSerializer
 
 
 class PageViewSet(viewsets.ViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticatedOrReadOnly, OnlyAuthorIfPrivate]
 
     @swagger_auto_schema(request_body=CreatePageSerializer, responses={201: PageSerializer()})
     def create(self, request):
-        """Создание новой страницы. В теле запроса передается название страницы и родительская страница."""
+        """Создание новой страницы. В теле запроса передается название страницы и родительская страница.
+        - доступно только авторизованным;
+        - родительская страница должна быть публичной или принадлежать пользователю;"""
         serializer = CreatePageSerializer(data=request.data, context={'user': request.user})
         serializer.is_valid(raise_exception=True)
         page = serializer.save(author=request.user)
         return Response(PageSerializer(page).data,
                         status=status.HTTP_201_CREATED)
 
-    def retrieve(self, request, pk=None):
-        pass
+    @swagger_auto_schema(responses={200: PageSerializer()})
+    def retrieve(self, request, pk):
+        """Получение общей информации о странице.
+        - доступно всем, если страница публична;
+        - доступно только автору, если страница приватна;"""
+        page = get_object_or_404(Page, pk=pk)
+        self.check_object_permissions(request, page)
+        return Response(PageSerializer(page).data,
+                        status=status.HTTP_200_OK)
 
     def partial_update(self, request, pk=None):
         pass
