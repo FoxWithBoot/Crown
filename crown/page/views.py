@@ -46,28 +46,32 @@ class PageViewSet(viewsets.ViewSet):
         pass
 
 
-class PageWriterList(mixins.ListModelMixin, viewsets.GenericViewSet):
-    permission_classes = [IsAuthenticated]
-    serializer_class = ShortPageSerializer
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['is_public', 'parent']
-    search_fields = ['^title']
-    ordering_fields = []
-
-    def get_queryset(self):
-        user = self.request.user
-        if 'in_other_space' in self.request.query_params:
-            return Page.objects.filter(Q(author=user) & ~Q(parent__author=user) & ~Q(parent__author=None))
-        return Page.objects.filter(author=user)
-
-
-class PageReaderList(mixins.ListModelMixin, viewsets.GenericViewSet):
-    permission_classes = [AllowAny]
-    serializer_class = ShortPageSerializer
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['is_public', 'parent']
-    search_fields = ['^title']
-    ordering_fields = ['title']
-
-    def get_queryset(self):
-        return Page.objects.filter(is_public=True)
+# class PageWriterList(mixins.ListModelMixin, viewsets.GenericViewSet):
+#     permission_classes = [IsAuthenticated]
+#     serializer_class = ShortPageSerializer
+#     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+#     filterset_fields = ['is_public', 'parent']
+#     search_fields = ['^title']
+#     ordering_fields = ['title']
+#
+#     def get_queryset(self):
+#         user = self.request.user
+#         if 'in_other_space' in self.request.query_params:
+#             return Page.objects.filter(Q(author=user) & ~Q(parent__author=user) & ~Q(parent=None))
+#         return Page.objects.filter(author=user)
+#
+#
+# class PageReaderList(mixins.ListModelMixin, viewsets.GenericViewSet):
+#     permission_classes = [AllowAny]
+#     serializer_class = ShortPageSerializer
+#     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+#     filterset_fields = ['parent', 'author']
+#     search_fields = ['^title']
+#     ordering_fields = ['title']
+#
+#     def get_queryset(self):
+#         if 'in_other_space' in self.request.query_params and 'author' in self.request.query_params:
+#             user = self.kwargs['author']
+#             return Page.objects.filter(Q(author=user) & ~Q(parent__author=user) & ~Q(parent=None))
+#
+#         return Page.objects.filter(is_public=True)

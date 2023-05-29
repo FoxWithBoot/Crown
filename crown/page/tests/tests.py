@@ -75,6 +75,17 @@ class TestPage(APITestCase):
         if username:
             self.login(username)
         response = self.client.get(self.url+str(page_id)+'/', format='json')
-        print(response)
         assert response.status_code == status
         assert response.content.decode('utf-8') == resp
+
+    # @parameterized.expand([
+    #     (None, '/page-writer-list/', 401, '{"detail":"Учетные данные не были предоставлены."}'),
+    #     ('User1', '/page-writer-list/', 200, '[{"id":5,"title":"Page_4"},{"id":6,"title":"Page_5"},{"id":7,"title":"Page_6"}]'),
+    #     ('User1', '/page-writer-list/?parent=', 200, '[{"id":5,"title":"Page_4"},{"id":6,"title":"Page_5"}]'),
+    # ])
+    # def test_pages_list_writer(self, username, url, status, resp):
+    #     if username:
+    #         self.login(username)
+    #     response = self.client.get(url, format='json')
+    #     assert response.status_code == status
+    #     assert response.content.decode('utf-8') == resp
