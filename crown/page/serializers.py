@@ -27,3 +27,9 @@ class PageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Page
         fields = '__all__'
+
+
+class ShortPageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Page
+        fields = ['id', 'title']
