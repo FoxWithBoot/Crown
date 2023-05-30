@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import serializers
 
 from .models import Page
@@ -21,7 +22,7 @@ class CreatePageSerializer(serializers.ModelSerializer):
         return value
 
 
-class PageSerializer(serializers.ModelSerializer):
+class DefaultPageSerializer(serializers.ModelSerializer):
     author = UserShortSerializer()
 
     class Meta:
@@ -33,3 +34,24 @@ class ShortPageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Page
         fields = ['id', 'title']
+
+
+class PagesTreeSerializer(serializers.ModelSerializer):
+    """Обрабатывает дерево страниц"""
+    subpages = serializers.SerializerMethodField()
+    author = UserShortSerializer()
+
+    class Meta:
+        model = Page
+        fields = ("id", "author", "title", "is_public", "subpages")
+
+    def get_subpages(self, instance):
+        if self.context.get('user').is_anonymous:
+            subpages = instance.subpages.all().filter(Q(is_public=True))
+        else:
+            subpages = instance.subpages.all().filter(Q(author=self.context.get('user')) | Q(is_public=True))
+        print(subpages)
+        print(PagesTreeSerializer(subpages, many=True, context=self.context).data)
+        if len(subpages) == 0:
+            return []
+        return PagesTreeSerializer(subpages, many=True, context=self.context).data
