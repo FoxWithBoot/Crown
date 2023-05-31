@@ -28,7 +28,7 @@ class DefaultPageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Page
-        fields = '__all__'
+        exclude = ['lft', 'rght', 'tree_id', 'level']
 
 
 class ShortPageSerializer(serializers.ModelSerializer):

@@ -1,20 +1,21 @@
 from django.db import models
 from django.db.models.signals import post_save
+from mptt.models import MPTTModel, TreeForeignKey
 
 from crown.models import AbstractAuthorsObj
 
 
-class Page(AbstractAuthorsObj):
+class Page(MPTTModel, AbstractAuthorsObj):
     """Страница"""
     title = models.CharField(max_length=150,
                              verbose_name="Название",
                              default="Страница")
-    parent = models.ForeignKey('self',
-                               on_delete=models.CASCADE,
-                               blank=True, null=True,
-                               verbose_name="Родительская страница",
-                               default=None,
-                               related_name="subpages")
+    parent = TreeForeignKey('self',
+                            on_delete=models.CASCADE,
+                            blank=True, null=True,
+                            verbose_name="Родительская страница",
+                            default=None,
+                            related_name="subpages")
 
     class Meta:
         verbose_name = "Страница"
