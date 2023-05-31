@@ -4,6 +4,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import viewsets, status, generics, mixins
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.filters import SearchFilter
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated, AllowAny
@@ -14,6 +15,7 @@ from .controller import get_parent_page
 from .models import Page
 from .permissions import OnlyAuthorIfPrivate
 from .serializers import CreatePageSerializer, DefaultPageSerializer, PagesTreeSerializer
+from user.models import User
 
 
 class PageViewSet(viewsets.ViewSet):
@@ -42,10 +44,28 @@ class PageViewSet(viewsets.ViewSet):
 
     @action(methods=['get'], detail=True)
     def subpages_tree(self, request, pk):
+        """Возвращает дерево корневой страницы по одному из ее предков.
+        Дополнительный параметр ?other_author=int добавляет в дерево подстраницы интересующего автора.
+        - Если пользователь - аноним, то он получит только опубликованные подстраницы автора вселенной
+                    и опубликованные подстраницы указанного (дополнительного) автора.
+        - Если пользователь - это автор вселенной, то он получит свои подстраницы
+                    и опубликованные подстраницы указанного (дополнительного) автора.
+        - Если пользователь авторизован, но это не его вселенная, то он получит
+                    опубликованные подстраницы автора вселенной, 
+                    свои подстраницы в данной вселенной
+                    и опубликованные страницы указанного (дополнительного) автора."""
         page = get_object_or_404(Page, pk=pk)
         self.check_object_permissions(request, page)
         parent_page = get_parent_page(page)
-        return Response(PagesTreeSerializer(parent_page, context={'user': request.user}).data,
+        other_author = request.query_params.get('other_author', None)
+        try:
+            other_author = other_author if User.objects.filter(pk=other_author).exists() else parent_page.author
+        except:
+            raise ValidationError(detail={"parent": ["Некорректный id автора"]})
+        pages_tree = PagesTreeSerializer(parent_page, context={'origin_author': parent_page.author,
+                                                               'user': request.user,
+                                                               'other_author': other_author})
+        return Response(pages_tree.data,
                         status=status.HTTP_200_OK)
 
     def partial_update(self, request, pk=None):
