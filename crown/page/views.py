@@ -11,7 +11,6 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticate
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .controller import get_parent_page
 from .models import Page
 from .permissions import OnlyAuthorIfPrivate
 from .serializers import CreatePageSerializer, DefaultPageSerializer, PagesTreeSerializer
@@ -56,7 +55,7 @@ class PageViewSet(viewsets.ViewSet):
                     и опубликованные страницы указанного (дополнительного) автора."""
         page = get_object_or_404(Page, pk=pk)
         self.check_object_permissions(request, page)
-        parent_page = get_parent_page(page)
+        parent_page = page.get_root()
         other_author = request.query_params.get('other_author', None)
         try:
             other_author = other_author if User.objects.filter(pk=other_author).exists() else parent_page.author

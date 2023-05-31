@@ -27,6 +27,7 @@ class TestPage(APITestCase):
         p1 = PageFactory.create(parent=page2, author=users[2], is_public=False)  # 9
         p1 = PageFactory.create(parent=p1, author=users[2], is_public=False)  # 10
 
+
     def login(self, username):
         response = self.client.post('/user/token/', {'username': username, 'password': '123'}, format='json')
         token = response.data.get('access')
@@ -87,7 +88,9 @@ class TestPage(APITestCase):
              '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
              '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]}]}'
          ),
-        (None, '7', 200, '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]}'),
+        (None, '7', 200, '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
+                         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
+                         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]}]}'),
         ('User0', '1', 200,
          '{"id":1,"author":{"id":1,"username":"User0"},"title":"Page_0","is_public":false,"subpages":['
              '{"id":2,"author":{"id":1,"username":"User0"},"title":"Page_1","is_public":false,"subpages":[]},'
@@ -99,23 +102,29 @@ class TestPage(APITestCase):
              '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
              '{"id":8,"author":{"id":1,"username":"User0"},"title":"Page_7","is_public":true,"subpages":[]}]}'),
         ('User0', '7', 200,
-         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]}'),
+         '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
+         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
+         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
+         '{"id":8,"author":{"id":1,"username":"User0"},"title":"Page_7","is_public":true,"subpages":[]}]}'),
         ('User1', '1', 403, '{"detail":"Доступ разрешен только автору."}'),
         ('User1', '5', 200,
          '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
              '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
              '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]}]}'),
-        ('User2', '5', 200,
+        ('User2', '10', 200,
          '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
              '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
              '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
              '{"id":9,"author":{"id":3,"username":"User2"},"title":"Page_8","is_public":false,"subpages":['
                 '{"id":10,"author":{"id":3,"username":"User2"},"title":"Page_9","is_public":false,"subpages":[]}]}]}'),
         ('User1', '7', 200,
-         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]}'),
+         '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
+         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
+         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]}]}'),
         ('User1', '77', 404, '{"detail":"Страница не найдена."}'),
     ])
     def test_get_subpages_tree(self, username, address, status, resp):
+        print(Page.objects.filter(parent=5))
         if username:
             self.login(username)
         response = self.client.get(self.url + address + '/subpages_tree/', format='json')
