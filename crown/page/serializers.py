@@ -25,10 +25,15 @@ class CreatePageSerializer(serializers.ModelSerializer):
 
 class DefaultPageSerializer(serializers.ModelSerializer):
     author = UserShortSerializer()
+    ancestral_line = serializers.SerializerMethodField(help_text="Путь к странице от корня")
 
     class Meta:
         model = Page
         exclude = ['lft', 'rght', 'tree_id', 'level']
+
+    def get_ancestral_line(self, instance):
+        ancestral_line = instance.get_ancestors(include_self=True)
+        return ShortPageSerializer(ancestral_line, many=True).data
 
 
 class ShortPageSerializer(serializers.ModelSerializer):

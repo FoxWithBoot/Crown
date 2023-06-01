@@ -35,19 +35,24 @@ class TestPage(APITestCase):
 
     @parameterized.expand([
         (None, {}, 401, '{"detail":"Учетные данные не были предоставлены."}'),
-        ('User0', {}, 201, '{"id":11,"author":{"id":1,"username":"User0"},"is_public":false,'
+        ('User0', {}, 201, '{"id":11,"author":{"id":1,"username":"User0"},'
+                           '"ancestral_line":[{"id":11,"title":"Страница"}],"is_public":false,'
                            '"title":"Страница","parent":null}'),
-        ('User0', {'title': 'Page'}, 201, '{"id":11,"author":{"id":1,"username":"User0"},"is_public":false,'
+        ('User0', {'title': 'Page'}, 201, '{"id":11,"author":{"id":1,"username":"User0"},'
+                                          '"ancestral_line":[{"id":11,"title":"Page"}],"is_public":false,'
                                           '"title":"Page","parent":null}'),
         ('User0', {'title': 'Page' * 100}, 400,
          '{"title":["Убедитесь, что это значение содержит не более 150 символов."]}'),
         # --------------------------------------------------------------------------------------------------------------
-        ('User0', {'parent': None}, 201, '{"id":11,"author":{"id":1,"username":"User0"},"is_public":false,'
+        ('User0', {'parent': None}, 201, '{"id":11,"author":{"id":1,"username":"User0"},'
+                                         '"ancestral_line":[{"id":11,"title":"Страница"}],"is_public":false,'
                                          '"title":"Страница","parent":null}'),
-        ('User0', {'parent': 1}, 201, '{"id":11,"author":{"id":1,"username":"User0"},"is_public":false,'
-                                      '"title":"Страница","parent":1}'),
-        ('User0', {'parent': 5}, 201, '{"id":11,"author":{"id":1,"username":"User0"},"is_public":false,'
-                                      '"title":"Страница","parent":5}'),
+        ('User0', {'parent': 1}, 201, '{"id":11,"author":{"id":1,"username":"User0"},'
+                                      '"ancestral_line":[{"id":1,"title":"Page_0"},{"id":11,"title":"Страница"}],'
+                                      '"is_public":false,"title":"Страница","parent":1}'),
+        ('User0', {'parent': 5}, 201, '{"id":11,"author":{"id":1,"username":"User0"},'
+                                      '"ancestral_line":[{"id":5,"title":"Page_4"},{"id":11,"title":"Страница"}],'
+                                      '"is_public":false,"title":"Страница","parent":5}'),
         ('User1', {'parent': 1}, 400, '{"parent":["Попытка доступа к чужой приватной странице"]}'),
         ('User1', {'parent': 19}, 400, '{"parent":["Недопустимый первичный ключ \\"19\\" - объект не существует."]}'),
         ('User1', {'parent': -19}, 400, '{"parent":["Недопустимый первичный ключ \\"-19\\" - объект не существует."]}'),
@@ -68,10 +73,20 @@ class TestPage(APITestCase):
             assert Road.objects.count() == self.count
 
     @parameterized.expand([
-        (None, 5, 200, '{"id":5,"author":{"id":2,"username":"User1"},"is_public":true,"title":"Page_4","parent":null}'),
+        (None, 5, 200, '{"id":5,"author":{"id":2,"username":"User1"},'
+                       '"ancestral_line":[{"id":5,"title":"Page_4"}],'
+                       '"is_public":true,"title":"Page_4","parent":null}'),
         (None, 1, 401, '{"detail":"Учетные данные не были предоставлены."}'),
         ('User2', 1, 403, '{"detail":"Доступ разрешен только автору."}'),
-        ('User0', 1, 200, '{"id":1,"author":{"id":1,"username":"User0"},"is_public":false,"title":"Page_0","parent":null}'),
+        ('User0', 1, 200, '{"id":1,"author":{"id":1,"username":"User0"},'
+                          '"ancestral_line":[{"id":1,"title":"Page_0"}],'
+                          '"is_public":false,"title":"Page_0","parent":null}'),
+        ('User2', 10, 200, '{"id":10,"author":{"id":3,"username":"User2"},'
+                           '"ancestral_line":['
+                               '{"id":5,"title":"Page_4"},'
+                               '{"id":9,"title":"Page_8"},'
+                               '{"id":10,"title":"Page_9"}],'
+                           '"is_public":false,"title":"Page_9","parent":9}'),
         ('User0', 101, 404, '{"detail":"Страница не найдена."}'),
     ])
     def test_get_page_info(self, username, page_id, status, resp):
@@ -163,6 +178,7 @@ class TestPage(APITestCase):
         response = self.client.get(url, format='json')
         assert response.status_code == status
         assert response.content.decode('utf-8') == resp
+
 
     # @parameterized.expand([
     #     (None, '/page-writer-list/', 401, '{"detail":"Учетные данные не были предоставлены."}'),
