@@ -1,3 +1,4 @@
+from django.db.models import F
 from parameterized import parameterized
 from rest_framework.test import APITestCase
 
@@ -5,6 +6,7 @@ from .factories import PageFactory
 from ..models import Page
 from user.tests import factories
 from road.models import Road
+from user.serializers import UserShortSerializer
 
 
 class TestPage(APITestCase):
@@ -175,6 +177,25 @@ class TestPage(APITestCase):
         if username:
             self.login(username)
         url = "{0}{1}/subpages_tree/?other_author={2}".format(self.url, address, author)
+        response = self.client.get(url, format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp
+
+    @parameterized.expand([
+        (None, '5', 200, '[{"id":2,"username":"User1"},{"id":1,"username":"User0"}]'),
+        (None, '7', 200, '[{"id":2,"username":"User1"},{"id":1,"username":"User0"}]'),
+        (None, '3', 401, '{"detail":"Учетные данные не были предоставлены."}'),
+        ('User0', '9', 403, '{"detail":"Доступ разрешен только автору."}'),
+        ('User0', '1', 200, '[{"id":1,"username":"User0"}]'),
+        ('User0', '8', 200, '[{"id":2,"username":"User1"},{"id":1,"username":"User0"}]'),
+        ('User1', '5', 200, '[{"id":2,"username":"User1"},{"id":1,"username":"User0"}]'),
+        ('User2', '5', 200, '[{"id":2,"username":"User1"},{"id":1,"username":"User0"},{"id":3,"username":"User2"}]'),
+        ('User2', '55', 404, '{"detail":"Страница не найдена."}'),
+    ])
+    def test_get_list_authors_in_space(self, username, address, status, resp):
+        if username:
+            self.login(username)
+        url = "{0}{1}/other_authors_list/".format(self.url, address)
         response = self.client.get(url, format='json')
         assert response.status_code == status
         assert response.content.decode('utf-8') == resp

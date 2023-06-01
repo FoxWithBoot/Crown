@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import Q, F
 from django.shortcuts import render, get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
@@ -11,10 +11,12 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticate
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .controller import get_list_public_authors_in_space
 from .models import Page
 from .permissions import OnlyAuthorIfPrivate
 from .serializers import CreatePageSerializer, DefaultPageSerializer, PagesTreeSerializer
 from user.models import User
+from user.serializers import UserShortSerializer
 
 
 class PageViewSet(viewsets.ViewSet):
@@ -66,6 +68,14 @@ class PageViewSet(viewsets.ViewSet):
                                                                'other_author': other_author})
         return Response(pages_tree.data,
                         status=status.HTTP_200_OK)
+
+    @action(methods=['get'], detail=True)
+    def other_authors_list(self, request, pk):
+        page = get_object_or_404(Page, pk=pk)
+        self.check_object_permissions(request, page)
+        authors_in_space = get_list_public_authors_in_space(page, request.user)
+        authors_list = UserShortSerializer(authors_in_space, many=True)
+        return Response(authors_list.data, status=status.HTTP_200_OK)
 
     def partial_update(self, request, pk=None):
         pass
