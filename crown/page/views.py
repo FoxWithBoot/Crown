@@ -14,7 +14,8 @@ from rest_framework.views import APIView
 from .controller import get_list_public_authors_in_space
 from .models import Page
 from .permissions import OnlyAuthorIfPrivate
-from .serializers import CreatePageSerializer, DefaultPageSerializer, PagesTreeSerializer, FakePagesTreeSerializer
+from .serializers import CreatePageSerializer, DefaultPageSerializer, PagesTreeSerializer, FakePagesTreeSerializer, \
+    ShortPageSerializerInList
 from user.models import User
 from user.serializers import UserShortSerializer
 
@@ -103,17 +104,13 @@ class PageViewSet(viewsets.ViewSet):
 #         return Page.objects.filter(author=user)
 #
 #
-# class PageReaderList(mixins.ListModelMixin, viewsets.GenericViewSet):
-#     permission_classes = [AllowAny]
-#     serializer_class = ShortPageSerializer
-#     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-#     filterset_fields = ['parent', 'author']
-#     search_fields = ['^title']
-#     ordering_fields = ['title']
-#
-#     def get_queryset(self):
-#         if 'in_other_space' in self.request.query_params and 'author' in self.request.query_params:
-#             user = self.kwargs['author']
-#             return Page.objects.filter(Q(author=user) & ~Q(parent__author=user) & ~Q(parent=None))
-#
-#         return Page.objects.filter(is_public=True)
+class PageReaderListViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+    permission_classes = [AllowAny]
+    serializer_class = ShortPageSerializerInList
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['author']
+    search_fields = ['^title']
+    ordering_fields = ['title']
+
+    def get_queryset(self):
+        return Page.objects.filter(is_public=True)

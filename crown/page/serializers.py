@@ -36,11 +36,23 @@ class DefaultPageSerializer(serializers.ModelSerializer):
         return ShortPageSerializer(ancestral_line, many=True).data
 
 
+class ShortPageSerializerInList(serializers.ModelSerializer):
+    author = UserShortSerializer()
+    ancestral_line = serializers.SerializerMethodField(help_text="Путь к странице от корня")
+
+    class Meta:
+        model = Page
+        fields = ['id', 'title', 'author', 'ancestral_line']
+
+    def get_ancestral_line(self, instance):
+        ancestral_line = instance.get_ancestors(include_self=True)
+        return ShortPageSerializer(ancestral_line, many=True).data
+
+
 class ShortPageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Page
         fields = ['id', 'title']
-
 
 class PagesTreeSerializer(serializers.ModelSerializer):
     """Обрабатывает дерево страниц"""
