@@ -14,7 +14,7 @@ from rest_framework.views import APIView
 from .controller import get_list_public_authors_in_space
 from .models import Page
 from .permissions import OnlyAuthorIfPrivate
-from .serializers import CreatePageSerializer, DefaultPageSerializer, PagesTreeSerializer
+from .serializers import CreatePageSerializer, DefaultPageSerializer, PagesTreeSerializer, FakePagesTreeSerializer
 from user.models import User
 from user.serializers import UserShortSerializer
 
@@ -43,6 +43,7 @@ class PageViewSet(viewsets.ViewSet):
         return Response(DefaultPageSerializer(page).data,
                         status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(responses={200: FakePagesTreeSerializer()})
     @action(methods=['get'], detail=True)
     def subpages_tree(self, request, pk):
         """Возвращает дерево корневой страницы по одному из ее предков.
@@ -69,8 +70,11 @@ class PageViewSet(viewsets.ViewSet):
         return Response(pages_tree.data,
                         status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(responses={200: UserShortSerializer(many=True)})
     @action(methods=['get'], detail=True)
     def other_authors_list(self, request, pk):
+        """Возвращает список пользователей, которые создавали и публиковали страницы в пределах вселенной страницы pk.
+        Нужен для фильтрации дерева страниц по пользователям (см. subpages_tree)"""
         page = get_object_or_404(Page, pk=pk)
         self.check_object_permissions(request, page)
         authors_in_space = get_list_public_authors_in_space(page, request.user)

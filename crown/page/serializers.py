@@ -75,3 +75,17 @@ class PagesTreeSerializer(serializers.ModelSerializer):
             subpages = subpages.filter((Q(is_public=True) & (Q(author=origin_author) | Q(author=other_author)))
                                        | Q(author=user))
         return PagesTreeSerializer(subpages, many=True, context=self.context).data
+
+
+class FakeRecursiveSerializer(serializers.Serializer):
+    """Рекурсивно проходится по дереву"""
+
+    def to_representation(self, instance):
+        serializer = self.parent.parent.__class__(instance, context=self.context)
+        if serializer.data.get('author') == self.context.get('user').id or serializer.data.get('is_public'):
+            return serializer.data
+
+class FakePagesTreeSerializer(PagesTreeSerializer):
+    """Выводит дерево страниц. Нужен для swagger отображения, но соответствует схеме выдач ответа"""
+    subpages = FakeRecursiveSerializer(many=True)
+
