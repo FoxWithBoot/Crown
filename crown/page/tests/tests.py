@@ -1,4 +1,3 @@
-from django.db.models import F
 from parameterized import parameterized
 from rest_framework.test import APITestCase
 
@@ -200,13 +199,7 @@ class TestPage(APITestCase):
         assert response.status_code == status
         assert response.content.decode('utf-8') == resp
 
-    @parameterized.expand([
-        ('', 200, ''),
-    ])
-    def test_reader_list(self, address, status, resp):
-        response = self.client.get("/page-reader-list/"+address, format='json')
-        assert response.status_code == status
-        assert response.content.decode('utf-8') == resp
+
 
 
     # @parameterized.expand([

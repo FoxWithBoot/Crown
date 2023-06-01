@@ -104,13 +104,13 @@ class PageViewSet(viewsets.ViewSet):
 #         return Page.objects.filter(author=user)
 #
 #
-class PageReaderListViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
-    permission_classes = [AllowAny]
-    serializer_class = ShortPageSerializerInList
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['author']
-    search_fields = ['^title']
-    ordering_fields = ['title']
-
-    def get_queryset(self):
-        return Page.objects.filter(is_public=True)
+# class PageReaderListViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
+#     permission_classes = [AllowAny]
+#     serializer_class = ShortPageSerializerInList
+#     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+#     filterset_fields = ['author']
+#     search_fields = ['^title']
+#     ordering_fields = ['title']
+#
+#     def get_queryset(self):
+#         return Page.objects.filter(is_public=True)
