@@ -8,6 +8,7 @@ from road.models import Road
 from user.serializers import UserShortSerializer
 
 
+
 class TestPage(APITestCase):
     url = '/page/'
     count = 10
@@ -19,15 +20,14 @@ class TestPage(APITestCase):
         u2 = users[1]
         u3 = users[2]
 
-        page1 = PageFactory.create(author=users[0])  # 1
-        pages1 = PageFactory.create_batch(3, parent=page1, author=users[0])  # 2 3 4
+        page1 = PageFactory.create(author=users[0], floor=0)  # 1
+        pages1 = PageFactory.create_batch(3, parent=page1, author=users[0], floor=0)  # 2 3 4
 
-        page2 = PageFactory.create(author=users[1], is_public=True)  # 5
-        pages2 = PageFactory.create_batch(2, parent=page2, author=users[1], is_public=True)  # 6 7
-        p1 = PageFactory.create(parent=page2, author=users[0], is_public=True)  # 8
-        p1 = PageFactory.create(parent=page2, author=users[2], is_public=False)  # 9
-        p1 = PageFactory.create(parent=p1, author=users[2], is_public=False)  # 10
-
+        page2 = PageFactory.create(author=users[1], is_public=True, floor=0)  # 5
+        pages2 = PageFactory.create_batch(2, parent=page2, author=users[1], is_public=True, floor=0)  # 6 7
+        p1 = PageFactory.create(parent=page2, author=users[0], is_public=True, floor=0)  # 8
+        p1 = PageFactory.create(parent=page2, author=users[2], is_public=False, floor=0)  # 9
+        p1 = PageFactory.create(parent=p1, author=users[2], is_public=False, floor=0)  # 10
 
     def login(self, username):
         response = self.client.post('/user/token/', {'username': username, 'password': '123'}, format='json')
@@ -59,6 +59,14 @@ class TestPage(APITestCase):
         ('User1', {'parent': -19}, 400, '{"parent":["Недопустимый первичный ключ \\"-19\\" - объект не существует."]}'),
         ('User1', {'parent': 'rt'}, 400,
          '{"parent":["Некорректный тип. Ожидалось значение первичного ключа, получен str."]}'),
+        # --------------------------------------------------------------------------------------------------------------
+        ('User1', {'parent': 1, 'where': {}}, 400, '{"parent":["Попытка доступа к чужой приватной странице"],"where":{"before_after":["Обязательное поле."],"page":["Обязательное поле."]}}'),
+        ('User0', {'parent': 1, 'where': {}}, 400, '{"where":{"before_after":["Обязательное поле."],"page":["Обязательное поле."]}}'),
+        ('User0', {'parent': 1, 'where': {'before_after': 'aas', 'page': 2}}, 400, '{"where":{"before_after":["Значения aas нет среди допустимых вариантов."]}}'),
+        ('User0', {'parent': 1, 'where': {'before_after': 'after', 'page': 1}}, 400, '{"where":{"page":["Указанная страница не является дочерней к parent"]}}'),
+        ('User0', {'parent': 1, 'where': {'before_after': 'after', 'page': 101}}, 400, '{"where":{"page":["Такой страницы не существует"]}}'),
+        ('User0', {'parent': 1, 'where': {'before_after': 'after', 'page': 'sd'}}, 400, '{"where":{"page":["Значение “sd” должно быть целым числом."]}}'),
+        ('User0', {'parent': 1, 'where': {'before_after': 'after', 'page': 2}}, 201, ''),
     ])
     def test_create_page(self, username, data, status, resp):
         if username:

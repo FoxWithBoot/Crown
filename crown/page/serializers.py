@@ -1,3 +1,4 @@
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from rest_framework import serializers
 
@@ -7,20 +8,56 @@ from user.serializers import UserShortSerializer
 from .validators import check_public_or_author
 
 
-class CreatePageSerializer(serializers.ModelSerializer):
-    """Сериализатор для создания новой страницы"""
+class WhereInsertPage(serializers.Serializer):
+    before_after = serializers.ChoiceField(choices=(('before', False), ('after', True)),
+                                           help_text="Вставлять до указанной страницы или после/")
+    page = serializers.ModelField(model_field=Page()._meta.get_field('id'), required=True)
 
     class Meta:
         model = Page
-        fields = ['title', 'parent']
+        fields = ['page', 'before_after']
+
+    def validate_page(self, value):
+        try:
+            page = Page.objects.get(id=value)
+            if not check_public_or_author(self.context['user'], page):
+                raise serializers.ValidationError("Попытка доступа к чужой приватной странице")
+            return page
+        except ObjectDoesNotExist:
+            raise serializers.ValidationError("Такой страницы не существует")
+
+
+class CreatePageSerializer(serializers.ModelSerializer):
+    """Сериализатор для создания новой страницы"""
+    where = WhereInsertPage(required=False, allow_null=False)
+
+    class Meta:
+        model = Page
+        fields = ['title', 'parent', 'where']
 
     def create(self, validated_data):
-        return Page.objects.create(**validated_data)
+        where = validated_data.get('where', None)
+        if where:
+            print(where)
+            validated_data.pop('where')
+            if where['before_after'] == 'after':
+                return Page.objects.create(**validated_data, floor=where['page'].floor+1)
+            else:
+                return Page.objects.create(**validated_data, floor=where['page'].floor - 1)
+        return Page.objects.create(**validated_data, floor=0)
 
     def validate_parent(self, value):
         if not check_public_or_author(self.context['user'], value):
             raise serializers.ValidationError("Попытка доступа к чужой приватной странице")
         return value
+
+    def validate(self, data):
+        parent = data.get('parent', None)
+        where = data.get('where', None)
+        if where and parent:
+            if where['page'].parent != parent:
+                raise serializers.ValidationError({'where':{'page':["Указанная страница не является дочерней к parent"]}})
+        return data
 
 
 class DefaultPageSerializer(serializers.ModelSerializer):
@@ -29,7 +66,7 @@ class DefaultPageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Page
-        exclude = ['lft', 'rght', 'tree_id', 'level']
+        exclude = ['lft', 'rght', 'tree_id', 'level', 'floor']
 
     def get_ancestral_line(self, instance):
         ancestral_line = instance.get_ancestors(include_self=True)
@@ -53,6 +90,7 @@ class ShortPageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Page
         fields = ['id', 'title']
+
 
 class PagesTreeSerializer(serializers.ModelSerializer):
     """Обрабатывает дерево страниц"""
