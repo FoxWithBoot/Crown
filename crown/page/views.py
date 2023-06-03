@@ -26,6 +26,7 @@ class PageViewSet(viewsets.ViewSet):
     @swagger_auto_schema(request_body=CreatePageSerializer, responses={201: DefaultPageSerializer()})
     def create(self, request):
         """Создание новой страницы. В теле запроса передается название страницы и родительская страница.
+        Дополнительно указывается блок where: до или после какой страницы вставить новую.
         - доступно только авторизованным;
         - родительская страница должна быть публичной или принадлежать пользователю;"""
         serializer = CreatePageSerializer(data=request.data, context={'user': request.user})

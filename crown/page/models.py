@@ -17,14 +17,11 @@ class Page(MPTTModel, AbstractAuthorsObj):
                             verbose_name="Родительская страница",
                             default=None,
                             related_name="subpages")
-    floor = models.PositiveIntegerField(verbose_name="Индекс в списке")
+    floor = models.PositiveIntegerField(blank=True, null=True, default=0, verbose_name="Индекс в списке подстраниц")
 
     class Meta:
         verbose_name = "Страница"
         verbose_name_plural = "Страницы"
-
-    class MPTTMeta:
-        order_insertion_by = ['floor']
 
     def __str__(self):
         return '{}'.format(self.id)
@@ -38,12 +35,17 @@ class Page(MPTTModel, AbstractAuthorsObj):
 
     @classmethod
     def update_floors_post_create(cls, sender, instance, created, *args, **kwargs):
+        """Обновляет значения floor старших братьев для новой страницы"""
         if created:
-            brothers_older = Page.objects.filter(author=instance.author, parent=instance.parent)
-            brothers_older = brothers_older.filter(Q(floor__gte=instance.level) & ~Q(id=instance.id))
+            if instance.parent:
+                brothers_older = Page.objects.filter(parent=instance.parent)
+            else:
+                brothers_older = Page.objects.filter(author=instance.author)
+            brothers_older = brothers_older.filter(Q(floor__gte=instance.floor) & ~Q(id=instance.id))
             for bro in brothers_older:
                 bro.floor += 1
                 bro.save()
+            instance.refresh_from_db()
 
 
 post_save.connect(Page.post_create, sender=Page)

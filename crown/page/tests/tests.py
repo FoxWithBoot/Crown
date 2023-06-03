@@ -1,5 +1,7 @@
 from parameterized import parameterized
 from rest_framework.test import APITestCase
+import networkx as nx
+from pyvis.network import Network
 
 from .factories import PageFactory
 from ..models import Page
@@ -8,6 +10,24 @@ from road.models import Road
 from user.serializers import UserShortSerializer
 
 
+def draw_pages_graph(filename):
+    pages = list(Page.objects.all())
+    nx_graph = nx.DiGraph()
+    for i in pages:
+        nx_graph.add_node(i.id, group=i.author.id, shape='circle' if i.is_public else 'box', label=str(i.id),
+                          title=f'title: {i.title}\n'
+                                f'public: {i.is_public}\n'
+                                f'author: {i.author}\n'
+                                f'floor: {i.floor}', )
+    for i in pages:
+        if i.parent:
+            nx_graph.add_edge(i.parent.id, i.id)
+
+    nt = Network(height='1000px', width='1000px', notebook=True, directed=True, layout=True)
+    nt.from_nx(nx_graph)
+    nt.toggle_physics(False)
+    nt.show_buttons(filter_=['layout', 'physics'])
+    nt.show(f'page/tests/graphics/{filename}.html')
 
 class TestPage(APITestCase):
     url = '/page/'
@@ -20,14 +40,15 @@ class TestPage(APITestCase):
         u2 = users[1]
         u3 = users[2]
 
-        page1 = PageFactory.create(author=users[0], floor=0)  # 1
-        pages1 = PageFactory.create_batch(3, parent=page1, author=users[0], floor=0)  # 2 3 4
+        page1 = PageFactory.create(author=users[0])  # 1
+        pages1 = PageFactory.create_batch(3, parent=page1, author=users[0])  # 2 3 4
 
-        page2 = PageFactory.create(author=users[1], is_public=True, floor=0)  # 5
-        pages2 = PageFactory.create_batch(2, parent=page2, author=users[1], is_public=True, floor=0)  # 6 7
-        p1 = PageFactory.create(parent=page2, author=users[0], is_public=True, floor=0)  # 8
-        p1 = PageFactory.create(parent=page2, author=users[2], is_public=False, floor=0)  # 9
-        p1 = PageFactory.create(parent=p1, author=users[2], is_public=False, floor=0)  # 10
+        page2 = PageFactory.create(author=users[1], is_public=True)  # 5
+        pages2 = PageFactory.create_batch(2, parent=page2, author=users[1], is_public=True)  # 6 7
+        p1 = PageFactory.create(parent=page2, author=users[0], is_public=True)  # 8
+        p1 = PageFactory.create(parent=page2, author=users[2], is_public=False)  # 9
+        p1 = PageFactory.create(parent=p1, author=users[2], is_public=False)  # 10
+        draw_pages_graph("start_graph")
 
     def login(self, username):
         response = self.client.post('/user/token/', {'username': username, 'password': '123'}, format='json')
@@ -59,6 +80,10 @@ class TestPage(APITestCase):
         ('User1', {'parent': -19}, 400, '{"parent":["Недопустимый первичный ключ \\"-19\\" - объект не существует."]}'),
         ('User1', {'parent': 'rt'}, 400,
          '{"parent":["Некорректный тип. Ожидалось значение первичного ключа, получен str."]}'),
+        ('User2', {'parent': 10}, 201,
+         '{"id":11,"author":{"id":3,"username":"User2"},'
+         '"ancestral_line":[{"id":5,"title":"Page_4"},{"id":9,"title":"Page_8"},{"id":10,"title":"Page_9"},{"id":11,"title":"Страница"}],'
+         '"is_public":false,"title":"Страница","parent":10}'),
         # --------------------------------------------------------------------------------------------------------------
         ('User1', {'parent': 1, 'where': {}}, 400, '{"parent":["Попытка доступа к чужой приватной странице"],"where":{"before_after":["Обязательное поле."],"page":["Обязательное поле."]}}'),
         ('User0', {'parent': 1, 'where': {}}, 400, '{"where":{"before_after":["Обязательное поле."],"page":["Обязательное поле."]}}'),
@@ -66,8 +91,21 @@ class TestPage(APITestCase):
         ('User0', {'parent': 1, 'where': {'before_after': 'after', 'page': 1}}, 400, '{"where":{"page":["Указанная страница не является дочерней к parent"]}}'),
         ('User0', {'parent': 1, 'where': {'before_after': 'after', 'page': 101}}, 400, '{"where":{"page":["Такой страницы не существует"]}}'),
         ('User0', {'parent': 1, 'where': {'before_after': 'after', 'page': 'sd'}}, 400, '{"where":{"page":["Значение “sd” должно быть целым числом."]}}'),
-        ('User0', {'parent': 1, 'where': {'before_after': 'after', 'page': 2}}, 201, ''),
-    ])
+        ('User0', {'parent': 1, 'where': {'before_after': 'after', 'page': 2}}, 201,
+         '{"id":11,"author":{"id":1,"username":"User0"},'
+         '"ancestral_line":[{"id":1,"title":"Page_0"},{"id":11,"title":"Страница"}],'
+         '"is_public":false,"title":"Страница","parent":1}'),
+        ('User0', {'parent': 1, 'where': {'before_after': 'before', 'page': 2}}, 201,
+         '{"id":11,"author":{"id":1,"username":"User0"},'
+         '"ancestral_line":[{"id":1,"title":"Page_0"},{"id":11,"title":"Страница"}],'
+         '"is_public":false,"title":"Страница","parent":1}'),
+        ('User1', {'parent': 5, 'where': {'before_after': 'before', 'page': 9}}, 400,
+         '{"where":{"page":["Попытка доступа к чужой приватной странице"]}}'),
+        ('User1', {'parent': 5, 'where': {'before_after': 'before', 'page': 8}}, 201,
+         '{"id":11,"author":{"id":2,"username":"User1"},'
+         '"ancestral_line":[{"id":5,"title":"Page_4"},{"id":11,"title":"Страница"}],'
+         '"is_public":false,"title":"Страница","parent":5}'),
+                ])
     def test_create_page(self, username, data, status, resp):
         if username:
             self.login(username)
@@ -77,6 +115,8 @@ class TestPage(APITestCase):
         if status == 201:
             assert Page.objects.count() == self.count + 1
             assert Road.objects.count() == self.count + 1
+            if data.get('where', None):
+                draw_pages_graph("create_page_" + data['where']['before_after'] + "_" + str(data['where']['page']))
         else:
             assert Page.objects.count() == self.count
             assert Road.objects.count() == self.count
@@ -109,42 +149,43 @@ class TestPage(APITestCase):
         (None, '1', 401, '{"detail":"Учетные данные не были предоставлены."}'),
         (None, '5', 200,
          '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
-             '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
-             '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]}]}'
+         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
+         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]}]}'
          ),
-        (None, '7', 200, '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
-                         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
-                         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]}]}'),
+        (None, '7', 200,
+         '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
+         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
+         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]}]}'),
         ('User0', '1', 200,
          '{"id":1,"author":{"id":1,"username":"User0"},"title":"Page_0","is_public":false,"subpages":['
-             '{"id":2,"author":{"id":1,"username":"User0"},"title":"Page_1","is_public":false,"subpages":[]},'
-             '{"id":3,"author":{"id":1,"username":"User0"},"title":"Page_2","is_public":false,"subpages":[]},'
-             '{"id":4,"author":{"id":1,"username":"User0"},"title":"Page_3","is_public":false,"subpages":[]}]}'),
+         '{"id":4,"author":{"id":1,"username":"User0"},"title":"Page_3","is_public":false,"subpages":[]},'
+         '{"id":3,"author":{"id":1,"username":"User0"},"title":"Page_2","is_public":false,"subpages":[]},'
+         '{"id":2,"author":{"id":1,"username":"User0"},"title":"Page_1","is_public":false,"subpages":[]}]}'),
         ('User0', '5', 200,
          '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
-             '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
-             '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
-             '{"id":8,"author":{"id":1,"username":"User0"},"title":"Page_7","is_public":true,"subpages":[]}]}'),
+         '{"id":8,"author":{"id":1,"username":"User0"},"title":"Page_7","is_public":true,"subpages":[]},'
+         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
+         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]}]}'),
         ('User0', '7', 200,
          '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
-         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
+         '{"id":8,"author":{"id":1,"username":"User0"},"title":"Page_7","is_public":true,"subpages":[]},'
          '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
-         '{"id":8,"author":{"id":1,"username":"User0"},"title":"Page_7","is_public":true,"subpages":[]}]}'),
+         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]}]}'),
         ('User1', '1', 403, '{"detail":"Доступ разрешен только автору."}'),
         ('User1', '5', 200,
          '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
-             '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
-             '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]}]}'),
+         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
+         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]}]}'),
         ('User2', '10', 200,
          '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
-             '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
-             '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
-             '{"id":9,"author":{"id":3,"username":"User2"},"title":"Page_8","is_public":false,"subpages":['
-                '{"id":10,"author":{"id":3,"username":"User2"},"title":"Page_9","is_public":false,"subpages":[]}]}]}'),
+         '{"id":9,"author":{"id":3,"username":"User2"},"title":"Page_8","is_public":false,"subpages":['
+            '{"id":10,"author":{"id":3,"username":"User2"},"title":"Page_9","is_public":false,"subpages":[]}]},'
+         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
+         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]}]}'),
         ('User1', '7', 200,
          '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
-         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
-         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]}]}'),
+         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
+         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]}]}'),
         ('User1', '77', 404, '{"detail":"Страница не найдена."}'),
     ])
     def test_get_subpages_tree(self, username, address, status, resp):
@@ -158,27 +199,26 @@ class TestPage(APITestCase):
     @parameterized.expand([
         (None, '5', '1', 200,
          '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
-         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
+         '{"id":8,"author":{"id":1,"username":"User0"},"title":"Page_7","is_public":true,"subpages":[]},'
          '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
-         '{"id":8,"author":{"id":1,"username":"User0"},"title":"Page_7","is_public":true,"subpages":[]}]}'
-         ),
+         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]}]}'),
         (None, '5', 'User0', 400, '{"parent":["Некорректный id автора"]}'),
         ('User1', '5', '1', 200,
          '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
-         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
-         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]}'
-         ',{"id":8,"author":{"id":1,"username":"User0"},"title":"Page_7","is_public":true,"subpages":[]}]}'),
+         '{"id":8,"author":{"id":1,"username":"User0"},"title":"Page_7","is_public":true,"subpages":[]},'
+         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
+         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]}]}'),
         ('User1', '5', '2', 200,
          '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
-         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
-         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]}]}'),
+         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
+         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]}]}'),
         ('User2', '5', '1', 200,
          '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":['
-         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]},'
-         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
-         '{"id":8,"author":{"id":1,"username":"User0"},"title":"Page_7","is_public":true,"subpages":[]},'
          '{"id":9,"author":{"id":3,"username":"User2"},"title":"Page_8","is_public":false,"subpages":['
-         '{"id":10,"author":{"id":3,"username":"User2"},"title":"Page_9","is_public":false,"subpages":[]}]}]}'),
+         '{"id":10,"author":{"id":3,"username":"User2"},"title":"Page_9","is_public":false,"subpages":[]}]},'
+         '{"id":8,"author":{"id":1,"username":"User0"},"title":"Page_7","is_public":true,"subpages":[]},'
+         '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
+         '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]}]}'),
     ])
     def test_get_subpages_tree_with_author_filter(self, username, address, author, status, resp):
         if username:

@@ -9,8 +9,8 @@ from .validators import check_public_or_author
 
 
 class WhereInsertPage(serializers.Serializer):
-    before_after = serializers.ChoiceField(choices=(('before', False), ('after', True)),
-                                           help_text="Вставлять до указанной страницы или после/")
+    before_after = serializers.ChoiceField(choices=(('before', 1), ('after', 2)),
+                                           help_text="Вставлять до или после указанной страницы")
     page = serializers.ModelField(model_field=Page()._meta.get_field('id'), required=True)
 
     class Meta:
@@ -18,6 +18,7 @@ class WhereInsertPage(serializers.Serializer):
         fields = ['page', 'before_after']
 
     def validate_page(self, value):
+        """Валидация поля page - id страницы до или после которой нужно вставить новую страницу"""
         try:
             page = Page.objects.get(id=value)
             if not check_public_or_author(self.context['user'], page):
@@ -38,12 +39,11 @@ class CreatePageSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         where = validated_data.get('where', None)
         if where:
-            print(where)
             validated_data.pop('where')
             if where['before_after'] == 'after':
                 return Page.objects.create(**validated_data, floor=where['page'].floor+1)
             else:
-                return Page.objects.create(**validated_data, floor=where['page'].floor - 1)
+                return Page.objects.create(**validated_data, floor=where['page'].floor)
         return Page.objects.create(**validated_data, floor=0)
 
     def validate_parent(self, value):
@@ -56,7 +56,7 @@ class CreatePageSerializer(serializers.ModelSerializer):
         where = data.get('where', None)
         if where and parent:
             if where['page'].parent != parent:
-                raise serializers.ValidationError({'where':{'page':["Указанная страница не является дочерней к parent"]}})
+                raise serializers.ValidationError({'where': {'page': ["Указанная страница не является дочерней к parent"]}})
         return data
 
 
@@ -124,9 +124,12 @@ class PagesTreeSerializer(serializers.ModelSerializer):
             и опубликованные страницы указанного (дополнительного) автора."""
             subpages = subpages.filter((Q(is_public=True) & (Q(author=origin_author) | Q(author=other_author)))
                                        | Q(author=user))
+        subpages = subpages.order_by('floor')
+        print(subpages.values('id', 'title', 'floor'))
         return PagesTreeSerializer(subpages, many=True, context=self.context).data
 
 
+#  =====================================================================================================================
 class FakeRecursiveSerializer(serializers.Serializer):
     """Рекурсивно проходится по дереву"""
 
@@ -134,6 +137,7 @@ class FakeRecursiveSerializer(serializers.Serializer):
         serializer = self.parent.parent.__class__(instance, context=self.context)
         if serializer.data.get('author') == self.context.get('user').id or serializer.data.get('is_public'):
             return serializer.data
+
 
 class FakePagesTreeSerializer(PagesTreeSerializer):
     """Выводит дерево страниц. Нужен для swagger отображения, но соответствует схеме выдач ответа"""
