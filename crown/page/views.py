@@ -15,7 +15,7 @@ from .controller import get_list_public_authors_in_space
 from .models import Page
 from .permissions import OnlyAuthorIfPrivate
 from .serializers import CreatePageSerializer, DefaultPageSerializer, PagesTreeSerializer, FakePagesTreeSerializer, \
-    ShortPageSerializerInList
+    ShortPageSerializerInList, UpdatePageSerializer
 from user.models import User
 from user.serializers import UserShortSerializer
 
@@ -32,8 +32,7 @@ class PageViewSet(viewsets.ViewSet):
         serializer = CreatePageSerializer(data=request.data, context={'user': request.user})
         serializer.is_valid(raise_exception=True)
         page = serializer.save(author=request.user)
-        return Response(DefaultPageSerializer(page).data,
-                        status=status.HTTP_201_CREATED)
+        return Response(DefaultPageSerializer(page).data, status=status.HTTP_201_CREATED)
 
     @swagger_auto_schema(responses={200: DefaultPageSerializer()})
     def retrieve(self, request, pk):
@@ -83,8 +82,18 @@ class PageViewSet(viewsets.ViewSet):
         authors_list = UserShortSerializer(authors_in_space, many=True)
         return Response(authors_list.data, status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(request_body=UpdatePageSerializer)
     def partial_update(self, request, pk=None):
-        pass
+        """Обновление заголовка страницы и статуса публикации.
+        При снятии с публикации страницы также снимаются с публикации все её дороги и все дочерние страницы с их дорогами в независимости от их авторства.
+        При публикации страницы публикуются её корневая дорога, а также все её предки с их корневыми дорогами.
+        Публикация не доступна если, одна из страниц-предков не опубликована и принадлежит другому пользователю."""
+        page = get_object_or_404(Page, pk=pk)
+        self.check_object_permissions(request, page)
+        serializer = UpdatePageSerializer(data=request.data, context={'user': request.user}, instance=page)
+        serializer.is_valid(raise_exception=True)
+        page = serializer.save()
+        return Response(DefaultPageSerializer(page).data, status=status.HTTP_200_OK)
 
     def destroy(self, request, pk=None):
         pass

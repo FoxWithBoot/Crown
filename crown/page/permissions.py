@@ -6,7 +6,7 @@ class OnlyAuthorIfPrivate(BasePermission):
     message = "Доступ разрешен только автору."
 
     def has_object_permission(self, request, view, obj):
-        if obj.is_public:
+        if obj.is_public and request.method in ['GET', 'POST']:
             return True
         if request.user == obj.author:
             return True

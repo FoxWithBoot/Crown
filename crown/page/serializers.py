@@ -4,8 +4,8 @@ from rest_framework import serializers
 
 from .models import Page
 from user.serializers import UserShortSerializer
-
 from .validators import check_public_or_author
+from road.models import Road
 
 
 class WhereInsertPage(serializers.Serializer):
@@ -60,30 +60,63 @@ class CreatePageSerializer(serializers.ModelSerializer):
         return data
 
 
+class UpdatePageSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Page
+        fields = ['title', 'is_public']
+
+    def validate_is_public(self, value):
+        author = self.context['user']
+        page = self.instance
+        ancestry = page.get_ancestors()
+        if value and ancestry.filter(Q(is_public=False) & ~Q(author=author)).exists():
+            raise serializers.ValidationError("Автор одной из родительских страниц отменил публикацию.")
+        return value
+
+    def update(self, instance, validated_data):
+        title = validated_data.get('title', None)
+        is_public = validated_data.get('is_public', None)
+        if title is not None and title != instance.title:
+            instance.title = title
+            instance.save()
+        if is_public is not None and is_public != instance.is_public:
+            if is_public:
+                pages = instance.get_ancestors(include_self=True)
+                roads = Road.objects.filter(page__in=list(pages), parent=None)
+            else:
+                pages = instance.get_descendants(include_self=True)
+                roads = Road.objects.filter(page__in=list(pages))
+            pages.update(is_public=is_public)
+            roads.update(is_public=is_public)
+            instance = Page.objects.get(pk=instance.pk)
+        return instance
+
+
 class DefaultPageSerializer(serializers.ModelSerializer):
     author = UserShortSerializer()
-    ancestral_line = serializers.SerializerMethodField(help_text="Путь к странице от корня")
+    ancestry = serializers.SerializerMethodField(help_text="Путь к странице от корня")
 
     class Meta:
         model = Page
         exclude = ['lft', 'rght', 'tree_id', 'level', 'floor']
 
-    def get_ancestral_line(self, instance):
-        ancestral_line = instance.get_ancestors(include_self=True)
-        return ShortPageSerializer(ancestral_line, many=True).data
+    def get_ancestry(self, instance):
+        ancestry = instance.get_ancestors(include_self=True)
+        return ShortPageSerializer(ancestry, many=True).data
 
 
 class ShortPageSerializerInList(serializers.ModelSerializer):
     author = UserShortSerializer()
-    ancestral_line = serializers.SerializerMethodField(help_text="Путь к странице от корня")
+    ancestry = serializers.SerializerMethodField(help_text="Путь к странице от корня")
 
     class Meta:
         model = Page
         fields = ['id', 'title', 'author', 'ancestral_line']
 
-    def get_ancestral_line(self, instance):
-        ancestral_line = instance.get_ancestors(include_self=True)
-        return ShortPageSerializer(ancestral_line, many=True).data
+    def get_ancestry(self, instance):
+        ancestry = instance.get_ancestors(include_self=True)
+        return ShortPageSerializer(ancestry, many=True).data
 
 
 class ShortPageSerializer(serializers.ModelSerializer):
