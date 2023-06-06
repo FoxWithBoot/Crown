@@ -15,7 +15,7 @@ from .controller import get_list_public_authors_in_space
 from .models import Page
 from .permissions import OnlyAuthorIfPrivate
 from .serializers import CreatePageSerializer, DefaultPageSerializer, PagesTreeSerializer, FakePagesTreeSerializer, \
-    ShortPageSerializerInList, UpdatePageSerializer
+    ShortPageSerializerInList, UpdatePageSerializer, WhereInsertPage, MovePageSerializer
 from user.models import User
 from user.serializers import UserShortSerializer
 
@@ -82,7 +82,7 @@ class PageViewSet(viewsets.ViewSet):
         authors_list = UserShortSerializer(authors_in_space, many=True)
         return Response(authors_list.data, status=status.HTTP_200_OK)
 
-    @swagger_auto_schema(request_body=UpdatePageSerializer)
+    @swagger_auto_schema(request_body=UpdatePageSerializer, responses={200: DefaultPageSerializer()})
     def partial_update(self, request, pk=None):
         """Обновление заголовка страницы и статуса публикации.
         При снятии с публикации страницы также снимаются с публикации все её дороги и все дочерние страницы с их дорогами в независимости от их авторства.
@@ -91,6 +91,19 @@ class PageViewSet(viewsets.ViewSet):
         page = get_object_or_404(Page, pk=pk)
         self.check_object_permissions(request, page)
         serializer = UpdatePageSerializer(data=request.data, context={'user': request.user}, instance=page)
+        serializer.is_valid(raise_exception=True)
+        page = serializer.save()
+        return Response(DefaultPageSerializer(page).data, status=status.HTTP_200_OK)
+
+    @swagger_auto_schema(request_body=MovePageSerializer, responses={200: DefaultPageSerializer()})
+    @action(methods=['patch'], detail=True)
+    def move_page(self, request, pk):
+        """Перемещение страницы по дереву. Указывается страница и до или после неё нужно вставить целевую страницу.
+        Если не указано до или после, то страница считается новой родительской страницей для целевой.
+        Если публичная страница перемещается в неопубликованную, то перемещаемая страница снимается с публикации."""
+        page = get_object_or_404(Page, pk=pk)
+        self.check_object_permissions(request, page)
+        serializer = MovePageSerializer(data=request.data, context={'user': request.user}, instance=page)
         serializer.is_valid(raise_exception=True)
         page = serializer.save()
         return Response(DefaultPageSerializer(page).data, status=status.HTTP_200_OK)

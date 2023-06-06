@@ -297,6 +297,58 @@ class TestPage(APITestCase):
             assert Road.objects.filter(is_public=data.get('is_public')).count() == count_r
             assert Page.objects.filter(is_public=data.get('is_public')).count() == count_p
 
+    @parameterized.expand([
+        (None, '1', {}, 401, '{"detail":"Учетные данные не были предоставлены."}'),
+        ('User2', '1', {}, 403, '{"detail":"Доступ разрешен только автору."}'),
+        ('User0', '1', {'before_after': 'ee'}, 400, '{"before_after":["Значения ee нет среди допустимых вариантов."],"page":["Обязательное поле."]}'),
+        ('User0', '1', {'page': 9}, 400, '{"page":["Попытка доступа к чужой приватной странице"]}'),
+        ('User1', '6', {'page': 7}, 200, '{"id":6,"author":{"id":2,"username":"User1"},'
+                                         '"ancestry":[{"id":5,"title":"Page_4"},'
+                                         '{"id":7,"title":"Page_6"},'
+                                         '{"id":6,"title":"Page_5"}],"is_public":true,"title":"Page_5","parent":7}'),
+        ('User1', '7', {'page': 8}, 200, '{"id":7,"author":{"id":2,"username":"User1"},'
+                                         '"ancestry":[{"id":5,"title":"Page_4"},'
+                                         '{"id":8,"title":"Page_7"},{"id":7,"title":"Page_6"}],'
+                                         '"is_public":true,"title":"Page_6","parent":8}'),
+        ('User2', '11', {'page': 5}, 200, '{"id":11,"author":{"id":3,"username":"User2"},'
+                                          '"ancestry":[{"id":5,"title":"Page_4"},{"id":11,"title":"Page_10"}],'
+                                          '"is_public":false,"title":"Page_10","parent":5}'),
+        ('User2', '11', {'page': 7}, 200, '{"id":11,"author":{"id":3,"username":"User2"},'
+                                          '"ancestry":[{"id":5,"title":"Page_4"},{"id":7,"title":"Page_6"},'
+                                          '{"id":11,"title":"Page_10"}],"is_public":false,"title":"Page_10","parent":7}'),
+        ('User2', '11', {'page': None}, 200, '{"id":11,"author":{"id":3,"username":"User2"},'
+                                             '"ancestry":[{"id":11,"title":"Page_10"}],'
+                                             '"is_public":false,"title":"Page_10","parent":null}'),
+        ('User0', '1', {'page': 1}, 400, '{"page":["Нельзя ссылаться на себя или своего потомка"]}'),
+        ('User0', '1', {'page': 4}, 400, '{"page":["Нельзя ссылаться на себя или своего потомка"]}'),
+        ('User0', '1', {'page': 4, 'before_after': 'before'}, 400, '{"page":["Нельзя ссылаться на себя или своего потомка"]}'),
+        ('User2', '11', {'page': 4, 'before_after': 'before'}, 400, '{"page":["Попытка доступа к чужой приватной странице"]}'),
+        ('User2', '10', {'page': 8, 'before_after': 'after'}, 200, '{"id":10,"author":{"id":3,"username":"User2"},'
+                                                                 '"ancestry":[{"id":5,"title":"Page_4"},'
+                                                                 '{"id":10,"title":"Page_9"}],'
+                                                                 '"is_public":false,"title":"Page_9","parent":5}'),
+        ('User2', '10', {'page': 8, 'before_after': 'before'}, 200, '{"id":10,"author":{"id":3,"username":"User2"},'
+                                                                 '"ancestry":[{"id":5,"title":"Page_4"},'
+                                                                 '{"id":10,"title":"Page_9"}],'
+                                                                 '"is_public":false,"title":"Page_9","parent":5}'),
+        ('User0', '8', {'page': 2, 'before_after': 'before'}, 200, '{"id":8,"author":{"id":1,"username":"User0"},'
+                                                                   '"ancestry":[{"id":1,"title":"Page_0"},'
+                                                                   '{"id":8,"title":"Page_7"}],'
+                                                                   '"is_public":false,"title":"Page_7","parent":1}'),
+        ('User0', '6', {'page': 9, 'before_after': 'after'}, 403, '{"detail":"Доступ разрешен только автору."}'),
+    ])
+    def test_move_page(self, username, address, data, status, resp):
+        if username:
+            self.login(username)
+        response = self.client.patch(self.url + address + "/move_page/", data, format='json')
+        assert response.status_code == status
+        if status == 200 and data.get('before_after', None):
+            draw_pages_graph("move_page_"+address+"_to_"+data['before_after']+"_page_"+str(data['page']))
+            # page = Page.objects.get(pk=int(address))
+            # print(page)
+            # print(Page.objects.filter(parent=page.parent).order_by('floor'))
+        assert response.content.decode('utf-8') == resp
+
 
     # @parameterized.expand([
     #     (None, '/page-writer-list/', 401, '{"detail":"Учетные данные не были предоставлены."}'),

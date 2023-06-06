@@ -2,7 +2,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from rest_framework import serializers
 
-from .models import Page
+from .models import Page, change_public_state, insert_cut_page
 from user.serializers import UserShortSerializer
 from .validators import check_public_or_author
 from road.models import Road
@@ -14,7 +14,6 @@ class WhereInsertPage(serializers.Serializer):
     page = serializers.ModelField(model_field=Page()._meta.get_field('id'), required=True)
 
     class Meta:
-        model = Page
         fields = ['page', 'before_after']
 
     def validate_page(self, value):
@@ -81,16 +80,45 @@ class UpdatePageSerializer(serializers.ModelSerializer):
             instance.title = title
             instance.save()
         if is_public is not None and is_public != instance.is_public:
-            if is_public:
-                pages = instance.get_ancestors(include_self=True)
-                roads = Road.objects.filter(page__in=list(pages), parent=None)
-            else:
-                pages = instance.get_descendants(include_self=True)
-                roads = Road.objects.filter(page__in=list(pages))
-            pages.update(is_public=is_public)
-            roads.update(is_public=is_public)
-            instance = Page.objects.get(pk=instance.pk)
+            instance = change_public_state(is_public, instance)
         return instance
+
+
+class MovePageSerializer(serializers.Serializer):
+    before_after = serializers.ChoiceField(choices=(('before', 1), ('after', 2)),
+                                           help_text="Вставлять до или после указанной страницы", required=False)
+    page = serializers.ModelField(model_field=Page()._meta.get_field('id'), required=True, allow_null=True)
+
+    def validate_page(self, value):
+        # print(self.instance)
+        """Валидация поля page - id страницы до или после которой нужно вставить новую страницу"""
+        try:
+            if value is None:
+                return None
+            page = Page.objects.get(id=value)
+            if not check_public_or_author(self.context['user'], page):
+                raise serializers.ValidationError("Попытка доступа к чужой приватной странице")
+            if page in list(self.instance.get_descendants(include_self=True)):
+                raise serializers.ValidationError("Нельзя ссылаться на себя или своего потомка")
+            return page
+        except ObjectDoesNotExist:
+            raise serializers.ValidationError("Такой страницы не существует")
+
+    def update(self, instance, validated_data):
+        insert_cut_page(instance, insert=False, created=False)
+        if 'before_after' in validated_data:
+            if validated_data['before_after'] == 'after':
+                instance.floor = validated_data['page'].floor + 1
+            else:
+                instance.floor = validated_data['page'].floor
+            instance.parent = validated_data['page'].parent
+            instance.save()
+            return insert_cut_page(instance, insert=True, created=False)
+        else:
+            instance.floor = 0
+            instance.parent = validated_data['page']
+            instance.save()
+            return insert_cut_page(instance, insert=True, created=False)
 
 
 class DefaultPageSerializer(serializers.ModelSerializer):
