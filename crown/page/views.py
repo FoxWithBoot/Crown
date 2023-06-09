@@ -1,4 +1,5 @@
 from django.db.models import Q, F
+from django.http import Http404
 from django.shortcuts import render, get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
@@ -108,8 +109,32 @@ class PageViewSet(viewsets.ViewSet):
         page = serializer.save()
         return Response(DefaultPageSerializer(page).data, status=status.HTTP_200_OK)
 
-    def destroy(self, request, pk=None):
-        pass
+    def destroy(self, request, pk):
+        """Удаление страницы. При первом вызове для страницы происходит мягкое удаление, то есть помещение в корзину.
+        При повторном вызове метода для уже 'удаленной' страницы, страница действительно удаляется (каскадно).
+        Помещение в корзину аналогично отмене публикации, то есть в корзину помещаются все подстраницы и дороги страницы,
+        не зависимо от авторства. При удалении страницы с публикации снимаются."""
+        try:
+            page = Page.objects.get(pk=pk)
+            self.check_object_permissions(request, page)
+            page.cut_page()
+            page.soft_delete()
+            return Response(status=status.HTTP_200_OK)
+        except Page.DoesNotExist:
+            try:
+                page = Page.objects.removed().get(pk=pk)
+                self.check_object_permissions(request, page)
+                page.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            except Page.DoesNotExist:
+                raise Http404
+
+    # @action(methods=['delete'], detail=True)
+    # def full_destroy(self, request, pk):
+    #     page = get_object_or_404(Page, pk=pk)
+    #     self.check_object_permissions(request, page)
+    #     page.delete()
+    #     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # class PageWriterList(mixins.ListModelMixin, viewsets.GenericViewSet):

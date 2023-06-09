@@ -2,10 +2,9 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from rest_framework import serializers
 
-from .models import Page, change_public_state, insert_cut_page
+from .models import Page
 from user.serializers import UserShortSerializer
 from .validators import check_public_or_author
-from road.models import Road
 
 
 class WhereInsertPage(serializers.Serializer):
@@ -80,7 +79,7 @@ class UpdatePageSerializer(serializers.ModelSerializer):
             instance.title = title
             instance.save()
         if is_public is not None and is_public != instance.is_public:
-            instance = change_public_state(is_public, instance)
+            instance = instance.change_public_state(is_public)
         return instance
 
 
@@ -105,7 +104,7 @@ class MovePageSerializer(serializers.Serializer):
             raise serializers.ValidationError("Такой страницы не существует")
 
     def update(self, instance, validated_data):
-        insert_cut_page(instance, insert=False, created=False)
+        instance.insert_cut_page(insert=False, created=False)
         if 'before_after' in validated_data:
             if validated_data['before_after'] == 'after':
                 instance.floor = validated_data['page'].floor + 1
@@ -113,12 +112,12 @@ class MovePageSerializer(serializers.Serializer):
                 instance.floor = validated_data['page'].floor
             instance.parent = validated_data['page'].parent
             instance.save()
-            return insert_cut_page(instance, insert=True, created=False)
+            return instance.insert_cut_page(insert=True, created=False)
         else:
             instance.floor = 0
             instance.parent = validated_data['page']
             instance.save()
-            return insert_cut_page(instance, insert=True, created=False)
+            return instance.insert_cut_page(insert=True, created=False)
 
 
 class DefaultPageSerializer(serializers.ModelSerializer):
@@ -127,7 +126,7 @@ class DefaultPageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Page
-        exclude = ['lft', 'rght', 'tree_id', 'level', 'floor']
+        exclude = ['lft', 'rght', 'tree_id', 'level', 'floor', 'is_removed']
 
     def get_ancestry(self, instance):
         ancestry = instance.get_ancestors(include_self=True)

@@ -50,6 +50,7 @@ class TestPage(APITestCase):
         pages2 = PageFactory.create_batch(2, parent=page2, author=users[1], is_public=True)  # P6 P7
         p1 = PageFactory.create(parent=page2, author=users[0], is_public=True)  # P8
         p1 = PageFactory.create(parent=page2, author=users[2], is_public=False)  # P9
+        #p1 = PageFactory.create(parent=page2, author=users[2], is_public=False, is_removed=True)  # P9
         p1 = PageFactory.create(parent=p1, author=users[2], is_public=False)  # P10
 
         PageFactory.create(parent=pages1[2], author=users[2])
@@ -344,11 +345,40 @@ class TestPage(APITestCase):
         assert response.status_code == status
         if status == 200 and data.get('before_after', None):
             draw_pages_graph("move_page_"+address+"_to_"+data['before_after']+"_page_"+str(data['page']))
-            # page = Page.objects.get(pk=int(address))
-            # print(page)
-            # print(Page.objects.filter(parent=page.parent).order_by('floor'))
         assert response.content.decode('utf-8') == resp
 
+    @parameterized.expand([
+        (None, '123', 401, '{"detail":"Учетные данные не были предоставлены."}', 0),
+        ('User0', '6', 403, '{"detail":"Доступ разрешен только автору."}', 0),
+        ('User0', '9', 403, '{"detail":"Доступ разрешен только автору."}', 0),
+        ('User0', '666', 404, '{"detail":"Страница не найдена."}', 0),
+        ('User0', '2', 200, '', 1),
+        ('User0', '1', 200, '', 5),
+    ])
+    def test_soft_delete_page(self, username, address, status, resp, count):
+        if username:
+            self.login(username)
+        response = self.client.delete(self.url + address+'/', format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp
+        assert Page.objects.count() == self.count - count
+        assert Page.objects.removed().count() == count
+
+    @parameterized.expand([
+        ('User0', '2', '2', 204, '', 1),
+        ('User0', '4', '4', 204, '', 2),
+        ('User0', '1', '3', 204, '', 1),
+        ('User0', '1', '1', 204, '', 5),
+        ('User0', '1', '4', 204, '', 2),
+    ])
+    def test_delete_page(self, username, address1, address2, status, resp, count):
+        self.login(username)
+        self.client.delete(self.url + address1 + '/', format='json')
+        response = self.client.delete(self.url + address2 + '/', format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp
+        assert Page.objects.all_pages().count() == self.count - count
+        #assert Page.objects.all_pages().count() == self.count - count_r
 
     # @parameterized.expand([
     #     (None, '/page-writer-list/', 401, '{"detail":"Учетные данные не были предоставлены."}'),
