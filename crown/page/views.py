@@ -109,6 +109,22 @@ class PageViewSet(viewsets.ViewSet):
         page = serializer.save()
         return Response(DefaultPageSerializer(page).data, status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(responses={200: DefaultPageSerializer()})
+    def update(self, request, pk):
+        """Восстановление удаленной в корзину страницы."""
+        try:
+            page = Page.objects.removed().get(pk=pk)
+            self.check_object_permissions(request, page)
+            ancestry = page.get_ancestors()
+            if ancestry.filter(Q(is_removed=True) & ~Q(author=request.user)).exists():
+                return Response(data={'detail': 'Одна из родительских страниц удалена автором.'},
+                                status=status.HTTP_400_BAD_REQUEST)
+            page.recovery()
+            return Response(DefaultPageSerializer(page).data, status=status.HTTP_200_OK)
+        except Page.DoesNotExist:
+            raise Http404
+
+    @swagger_auto_schema(responses={200: '', 204: ''})
     def destroy(self, request, pk):
         """Удаление страницы. При первом вызове для страницы происходит мягкое удаление, то есть помещение в корзину.
         При повторном вызове метода для уже 'удаленной' страницы, страница действительно удаляется (каскадно).
@@ -117,7 +133,6 @@ class PageViewSet(viewsets.ViewSet):
         try:
             page = Page.objects.get(pk=pk)
             self.check_object_permissions(request, page)
-            page.cut_page()
             page.soft_delete()
             return Response(status=status.HTTP_200_OK)
         except Page.DoesNotExist:
@@ -128,13 +143,6 @@ class PageViewSet(viewsets.ViewSet):
                 return Response(status=status.HTTP_204_NO_CONTENT)
             except Page.DoesNotExist:
                 raise Http404
-
-    # @action(methods=['delete'], detail=True)
-    # def full_destroy(self, request, pk):
-    #     page = get_object_or_404(Page, pk=pk)
-    #     self.check_object_permissions(request, page)
-    #     page.delete()
-    #     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # class PageWriterList(mixins.ListModelMixin, viewsets.GenericViewSet):

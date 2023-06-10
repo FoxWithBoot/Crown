@@ -378,7 +378,33 @@ class TestPage(APITestCase):
         assert response.status_code == status
         assert response.content.decode('utf-8') == resp
         assert Page.objects.all_pages().count() == self.count - count
-        #assert Page.objects.all_pages().count() == self.count - count_r
+
+    @parameterized.expand([
+        (1, None, '1', 401, '{"detail":"Учетные данные не были предоставлены."}', 5),
+        (1, 'User2', '1', 403, '{"detail":"Доступ разрешен только автору."}', 5),
+        (1, 'User0', '1', 200, '{"id":1,"author":{"id":1,"username":"User0"},"'
+                               'ancestry":[{"id":1,"title":"Page_0"}],'
+                               '"is_public":false,"title":"Page_0","parent":null}', 4),
+        (1, 'User0', '4', 200, '{"id":4,"author":{"id":1,"username":"User0"},'
+                               '"ancestry":[{"id":1,"title":"Page_0"},{"id":4,"title":"Page_3"}],'
+                               '"is_public":false,"title":"Page_3","parent":1}', 3),
+        (1, 'User0', '11', 403, '{"detail":"Доступ разрешен только автору."}', 5),
+        (1, 'User2', '11', 400, '{"detail":"Одна из родительских страниц удалена автором."}', 5),
+        (1, 'User2', '121', 404, '{"detail":"Страница не найдена."}', 5),
+        (11, 'User2', '11', 200, '{"id":11,"author":{"id":3,"username":"User2"},'
+                                 '"ancestry":'
+                                 '[{"id":1,"title":"Page_0"},{"id":4,"title":"Page_3"},{"id":11,"title":"Page_10"}],'
+                                 '"is_public":false,"title":"Page_10","parent":4}', 0),
+    ])
+    def test_recovery_page(self, pk, username, address, status, resp, count):
+        Page.objects.get(pk=pk).soft_delete()
+        if username:
+            self.login(username)
+        response = self.client.put(self.url + address+'/', format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp
+        assert Page.objects.count() == self.count - count
+        assert Page.objects.removed().count() == count
 
     # @parameterized.expand([
     #     (None, '/page-writer-list/', 401, '{"detail":"Учетные данные не были предоставлены."}'),

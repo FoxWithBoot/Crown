@@ -65,7 +65,6 @@ class Page(MPTTModel, AbstractAuthorsObj):
                 bro.floor += 1
             else:
                 bro.floor -= 1
-            print('aaa', bro, bro.floor)
             bro.save()
         if not created and insert:
             if self.parent and not self.parent.is_public:
@@ -97,9 +96,11 @@ class Page(MPTTModel, AbstractAuthorsObj):
         return self
 
     def soft_delete(self):
+        self.cut_page()
         self._change_remove_state(True)
 
     def recovery(self):
+        self.insert_page()
         self._change_remove_state(False)
 
 
