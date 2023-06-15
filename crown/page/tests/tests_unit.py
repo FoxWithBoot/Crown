@@ -54,7 +54,7 @@ class TestPage(APITestCase):
         p1 = PageFactory.create(parent=p1, author=users[2], is_public=False)  # P10
 
         PageFactory.create(parent=pages1[2], author=users[2])  # P11
-        draw_pages_graph("start_graph")
+        #draw_pages_graph("start_graph")
 
         RoadFactory.create_batch(3, page=pages2[1], author=u, parent=Road.objects.get(page=pages2[1], parent=None))
         RoadFactory.create_batch(3, page=pages2[0], author=u2, parent=Road.objects.get(page=pages2[0], parent=None), is_public=True)

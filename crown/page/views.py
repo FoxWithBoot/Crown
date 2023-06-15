@@ -1,22 +1,24 @@
-from django.db.models import Q, F
+from django.db.models import Q
 from django.http import Http404
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.openapi import Parameter, IN_QUERY
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import viewsets, status, generics, mixins
+from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import SearchFilter
 from rest_framework.filters import OrderingFilter
-from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from .controller import get_list_public_authors_in_space
+from .filters import PageFilter
 from .models import Page
 from .permissions import OnlyAuthorIfPrivate
 from .serializers import CreatePageSerializer, DefaultPageSerializer, PagesTreeSerializer, FakePagesTreeSerializer, \
-    ShortPageSerializerInList, UpdatePageSerializer, WhereInsertPage, MovePageSerializer
+    UpdatePageSerializer, MovePageSerializer, ShortPageSerializer
+
 from user.models import User
 from user.serializers import UserShortSerializer
 
@@ -45,19 +47,24 @@ class PageViewSet(viewsets.ViewSet):
         return Response(DefaultPageSerializer(page).data,
                         status=status.HTTP_200_OK)
 
-    @swagger_auto_schema(responses={200: FakePagesTreeSerializer()})
+    @swagger_auto_schema(responses={200: FakePagesTreeSerializer()},
+                         manual_parameters=[Parameter('other_author', IN_QUERY,
+                                                      'Добавляет в дерево подстраницы интересующего автора',
+                                                      type='int'), ])
     @action(methods=['get'], detail=True)
     def subpages_tree(self, request, pk):
-        """Возвращает дерево корневой страницы по одному из ее предков.
-        Дополнительный параметр ?other_author=int добавляет в дерево подстраницы интересующего автора.
+        """
+        Возвращает дерево корневой страницы по одному из ее предков.
         - Если пользователь - аноним, то он получит только опубликованные подстраницы автора вселенной
                     и опубликованные подстраницы указанного (дополнительного) автора.
         - Если пользователь - это автор вселенной, то он получит свои подстраницы
                     и опубликованные подстраницы указанного (дополнительного) автора.
         - Если пользователь авторизован, но это не его вселенная, то он получит
-                    опубликованные подстраницы автора вселенной, 
+                    опубликованные подстраницы автора вселенной,
                     свои подстраницы в данной вселенной
-                    и опубликованные страницы указанного (дополнительного) автора."""
+                    и опубликованные страницы указанного (дополнительного) автора.
+        """
+
         page = get_object_or_404(Page, pk=pk)
         self.check_object_permissions(request, page)
         parent_page = page.get_root()
@@ -145,28 +152,22 @@ class PageViewSet(viewsets.ViewSet):
                 raise Http404
 
 
-# class PageWriterList(mixins.ListModelMixin, viewsets.GenericViewSet):
-#     permission_classes = [IsAuthenticated]
-#     serializer_class = ShortPageSerializer
-#     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-#     filterset_fields = ['is_public', 'parent']
-#     search_fields = ['^title']
-#     ordering_fields = ['title']
-#
-#     def get_queryset(self):
-#         user = self.request.user
-#         if 'in_other_space' in self.request.query_params:
-#             return Page.objects.filter(Q(author=user) & ~Q(parent__author=user) & ~Q(parent=None))
-#         return Page.objects.filter(author=user)
-#
-#
-# class PageReaderListViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
-#     permission_classes = [AllowAny]
-#     serializer_class = ShortPageSerializerInList
-#     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-#     filterset_fields = ['author']
-#     search_fields = ['^title']
-#     ordering_fields = ['title']
-#
-#     def get_queryset(self):
-#         return Page.objects.filter(is_public=True)
+class PagesWriterList(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """Выдает списки страниц, принадлежащих авторизованному пользователю. С рядом фильтров, сортировкой и поиском.
+    - without_parent=True - вселенные пользователя;
+    - in_other_space=True - страницы пользователя с чужими родительскими страницами;
+    - is_removed=True - корзина страниц пользователя."""
+    permission_classes = [IsAuthenticated]
+    serializer_class = ShortPageSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = PageFilter
+    search_fields = ['^title']
+    ordering_fields = ['title']
+
+    def get_queryset(self):
+        user = self.request.user
+        if 'is_removed' not in self.request.query_params:
+            return Page.objects.filter(author=user)
+        return Page.objects.all_pages().filter(author=user)
+
+

@@ -406,14 +406,39 @@ class TestPage(APITestCase):
         assert Page.objects.count() == self.count - count
         assert Page.objects.removed().count() == count
 
-    # @parameterized.expand([
-    #     (None, '/page-writer-list/', 401, '{"detail":"Учетные данные не были предоставлены."}'),
-    #     ('User1', '/page-writer-list/', 200, '[{"id":5,"title":"Page_4"},{"id":6,"title":"Page_5"},{"id":7,"title":"Page_6"}]'),
-    #     ('User1', '/page-writer-list/?parent=', 200, '[{"id":5,"title":"Page_4"},{"id":6,"title":"Page_5"}]'),
-    # ])
-    # def test_pages_list_writer(self, username, url, status, resp):
-    #     if username:
-    #         self.login(username)
-    #     response = self.client.get(url, format='json')
-    #     assert response.status_code == status
-    #     assert response.content.decode('utf-8') == resp
+    @parameterized.expand([
+        (None, '/page-writer-list/', 401, '{"detail":"Учетные данные не были предоставлены."}'),
+        ('User1', '/page-writer-list/', 200, '[{"id":5,"title":"Page_4"},{"id":6,"title":"Page_5"},{"id":7,"title":"Page_6"}]'),
+        ('User1', '/page-writer-list/?without_parent=True', 200, '[{"id":5,"title":"Page_4"}]'),
+        ('User0', '/page-writer-list/?without_parent=True', 200, '[{"id":1,"title":"Page_0"}]'),
+        ('User0', '/page-writer-list/?is_public=True', 200, '[{"id":8,"title":"Page_7"}]'),
+        ('User2', '/page-writer-list/?is_public=True', 200, '[]'),
+        ('User2', '/page-writer-list/?parent__author=User2', 400, '{"parent__author":["Выберите корректный вариант. Вашего варианта нет среди допустимых значений."]}'),
+        ('User2', '/page-writer-list/?parent__author=5', 400, '{"parent__author":["Выберите корректный вариант. Вашего варианта нет среди допустимых значений."]}'),
+        ('User2', '/page-writer-list/?parent__author=1', 200, '[{"id":11,"title":"Page_10"}]'),
+        ('User2', '/page-writer-list/?in_other_space=True', 200, '[{"id":9,"title":"Page_8"},{"id":11,"title":"Page_10"}]'),
+    ])
+    def test_pages_list_writer(self, username, url, status, resp):
+        if username:
+            self.login(username)
+        response = self.client.get(url, format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp
+
+    @parameterized.expand([
+        (1, 'User0', '/page-writer-list/', 200, '[{"id":8,"title":"Page_7"}]'),
+        (1, 'User0', '/page-writer-list/?is_removed=False', 200, '[{"id":8,"title":"Page_7"}]'),
+        (1, 'User0', '/page-writer-list/?is_removed=True', 200, '[{"id":1,"title":"Page_0"},{"id":2,"title":"Page_1"},{"id":3,"title":"Page_2"},{"id":4,"title":"Page_3"}]'),
+        (1, 'User0', '/page-writer-list/?is_removed=True&without_parent=True', 200, '[{"id":1,"title":"Page_0"}]'),
+        (8, 'User0', '/page-writer-list/?is_removed=True&without_parent=True', 200, '[]'),
+        (8, 'User0', '/page-writer-list/?is_removed=True&in_other_space=True', 200, '[{"id":8,"title":"Page_7"}]'),
+        (5, 'User0', '/page-writer-list/?is_removed=True', 200, '[{"id":8,"title":"Page_7"}]'),
+        (5, 'User0', '/page-writer-list/?is_public=False', 200, '[{"id":1,"title":"Page_0"},{"id":2,"title":"Page_1"},{"id":3,"title":"Page_2"},{"id":4,"title":"Page_3"}]'),
+    ])
+    def test_rubber_box_list(self, pk_del, username, url, status, resp):
+        Page.objects.get(pk=pk_del).soft_delete()
+        if username:
+            self.login(username)
+        response = self.client.get(url, format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp
