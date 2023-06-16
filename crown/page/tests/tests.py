@@ -50,7 +50,6 @@ class TestPage(APITestCase):
         pages2 = PageFactory.create_batch(2, parent=page2, author=users[1], is_public=True)  # P6 P7
         p1 = PageFactory.create(parent=page2, author=users[0], is_public=True)  # P8
         p1 = PageFactory.create(parent=page2, author=users[2], is_public=False)  # P9
-        #p1 = PageFactory.create(parent=page2, author=users[2], is_public=False, is_removed=True)  # P9
         p1 = PageFactory.create(parent=p1, author=users[2], is_public=False)  # P10
 
         PageFactory.create(parent=pages1[2], author=users[2])
@@ -199,7 +198,6 @@ class TestPage(APITestCase):
         ('User1', '77', 404, '{"detail":"Страница не найдена."}'),
     ])
     def test_get_subpages_tree(self, username, address, status, resp):
-        print(Page.objects.filter(parent=5))
         if username:
             self.login(username)
         response = self.client.get(self.url + address + '/subpages_tree/', format='json')
