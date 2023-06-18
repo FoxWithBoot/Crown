@@ -1,7 +1,7 @@
 
-def check_public_or_author(user, page):
+def check_public_or_author(user, obj):
     """Проверка на то, что страница либо опубликована, либо принадлежит пользователю"""
-    if page:
-        if not page.is_public and page.author != user:
+    if obj:
+        if not obj.is_public and obj.author != user:
             return False
     return True

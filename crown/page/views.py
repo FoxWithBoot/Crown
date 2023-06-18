@@ -15,12 +15,13 @@ from rest_framework.response import Response
 from .controller import get_list_public_authors_in_space
 from .filters import PageFilter
 from .models import Page
-from .permissions import OnlyAuthorIfPrivate
+
 from .serializers import CreatePageSerializer, DefaultPageSerializer, PagesTreeSerializer, FakePagesTreeSerializer, \
     UpdatePageSerializer, MovePageSerializer, ShortPageSerializer
 
 from user.models import User
 from user.serializers import UserShortSerializer
+from crown.permissions import OnlyAuthorIfPrivate
 
 
 class PageViewSet(viewsets.ViewSet):

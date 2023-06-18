@@ -4,7 +4,7 @@ from rest_framework import serializers
 
 from .models import Page
 from user.serializers import UserShortSerializer
-from .validators import check_public_or_author
+from crown.validators import check_public_or_author
 
 
 class WhereInsertPage(serializers.Serializer):

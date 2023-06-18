@@ -198,6 +198,7 @@ class TestPage(APITestCase):
         ('User1', '77', 404, '{"detail":"Страница не найдена."}'),
     ])
     def test_get_subpages_tree(self, username, address, status, resp):
+        print(Page.objects.filter(parent=5))
         if username:
             self.login(username)
         response = self.client.get(self.url + address + '/subpages_tree/', format='json')
