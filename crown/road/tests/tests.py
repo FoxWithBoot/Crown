@@ -137,3 +137,22 @@ class TestRoad(APITestCase):
         assert response.status_code == status
         assert response.content.decode('utf-8') == resp
         assert Road.objects.count() == self.count + c
+
+    @parameterized.expand([
+        (None, '1', 200, '{"id":1,"author":{"id":1,"username":"User0"},"page":{"id":1,"title":"Test Page 1"},"ancestry":[{"id":1,"title":"Дорога"}],"is_public":true,"title":"Дорога","parent":null}'),
+        (None, '3', 200, '{"id":3,"author":{"id":1,"username":"User0"},"page":{"id":1,"title":"Test Page 1"},"ancestry":[{"id":1,"title":"Дорога"},{"id":3,"title":"Alt2"}],"is_public":true,"title":"Alt2","parent":1}'),
+        (None, '2', 401, '{"detail":"Учетные данные не были предоставлены."}'),
+        ('User0', '1', 200, '{"id":1,"author":{"id":1,"username":"User0"},"page":{"id":1,"title":"Test Page 1"},"ancestry":[{"id":1,"title":"Дорога"}],"is_public":true,"title":"Дорога","parent":null}'),
+        ('User0', '3', 200, '{"id":3,"author":{"id":1,"username":"User0"},"page":{"id":1,"title":"Test Page 1"},"ancestry":[{"id":1,"title":"Дорога"},{"id":3,"title":"Alt2"}],"is_public":true,"title":"Alt2","parent":1}'),
+        ('User0', '2', 200, '{"id":2,"author":{"id":1,"username":"User0"},"page":{"id":1,"title":"Test Page 1"},"ancestry":[{"id":1,"title":"Дорога"},{"id":2,"title":"Alt"}],"is_public":false,"title":"Alt","parent":1}'),
+        ('User0', '5', 200, '{"id":5,"author":{"id":2,"username":"User1"},"page":{"id":1,"title":"Test Page 1"},"ancestry":[{"id":1,"title":"Дорога"},{"id":5,"title":"Alt4"}],"is_public":true,"title":"Alt4","parent":1}'),
+        ('User0', '4', 403, '{"detail":"Доступ разрешен только автору."}'),
+        ('User0', '40', 404, '{"detail":"Страница не найдена."}'),
+        ('User0', '7', 200, '{"id":7,"author":{"id":3,"username":"User2"},"page":{"id":1,"title":"Test Page 1"},"ancestry":[{"id":1,"title":"Дорога"},{"id":5,"title":"Alt4"},{"id":6,"title":"Alt5"},{"id":7,"title":"Alt5"}],"is_public":true,"title":"Alt5","parent":6}'),
+    ])
+    def test_get_road_info(self, username, road_id, status, resp):
+        if username:
+            self.login(username)
+        response = self.client.get(self.url+road_id+'/', format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp

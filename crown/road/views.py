@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.response import Response
 from rest_framework import viewsets, status
@@ -5,6 +6,7 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 from crown.permissions import OnlyAuthorIfPrivate
 
+from .models import Road
 from .serializers import CreateRoadSerializer, DefaultRoadSerializer
 
 
@@ -23,8 +25,13 @@ class RoadViewSet(viewsets.ViewSet):
         road = serializer.save(author=request.user)
         return Response(DefaultRoadSerializer(road).data, status=status.HTTP_201_CREATED)
 
-    def retrieve(self, request, pk=None):
-        pass
+    def retrieve(self, request, pk):
+        """Получение общей информации о ветке.
+                - доступно всем, если дорога публична;
+                - доступно только автору, если дорога приватна;"""
+        road = get_object_or_404(Road, pk=pk)
+        self.check_object_permissions(request, road)
+        return Response(DefaultRoadSerializer(road).data, status=status.HTTP_200_OK)
 
     def update(self, request, pk=None):
         pass

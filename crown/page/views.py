@@ -45,8 +45,7 @@ class PageViewSet(viewsets.ViewSet):
         - доступно только автору, если страница приватна;"""
         page = get_object_or_404(Page, pk=pk)
         self.check_object_permissions(request, page)
-        return Response(DefaultPageSerializer(page).data,
-                        status=status.HTTP_200_OK)
+        return Response(DefaultPageSerializer(page).data, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(responses={200: FakePagesTreeSerializer()},
                          manual_parameters=[Parameter('other_author', IN_QUERY,
