@@ -25,6 +25,7 @@ class RoadViewSet(viewsets.ViewSet):
         road = serializer.save(author=request.user)
         return Response(DefaultRoadSerializer(road).data, status=status.HTTP_201_CREATED)
 
+    @swagger_auto_schema(responses={200: DefaultRoadSerializer()})
     def retrieve(self, request, pk):
         """Получение общей информации о ветке.
                 - доступно всем, если дорога публична;
