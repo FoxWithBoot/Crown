@@ -196,9 +196,9 @@ class TestPage(APITestCase):
          '{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},'
          '{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]}]}'),
         ('User1', '77', 404, '{"detail":"Страница не найдена."}'),
+        ('User2', '11', 403, '{"detail":"Доступ разрешен только автору."}'),
     ])
     def test_get_subpages_tree(self, username, address, status, resp):
-        print(Page.objects.filter(parent=5))
         if username:
             self.login(username)
         response = self.client.get(self.url + address + '/subpages_tree/', format='json')
@@ -234,6 +234,19 @@ class TestPage(APITestCase):
             self.login(username)
         url = "{0}{1}/subpages_tree/?other_author={2}".format(self.url, address, author)
         response = self.client.get(url, format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp
+
+    @parameterized.expand([
+        (None, '5/subpages_tree/?other_author=1&other_author=2', 200, '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":[{"id":8,"author":{"id":1,"username":"User0"},"title":"Page_7","is_public":true,"subpages":[]},{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]}]}'),
+        (None, '5/subpages_tree/?other_author=1&other_author=22', 200, '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":[{"id":8,"author":{"id":1,"username":"User0"},"title":"Page_7","is_public":true,"subpages":[]},{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]}]}'),
+        (None, '5/subpages_tree/?other_author=1&other_author=2r2', 400, '{"parent":["Некорректный id автора"]}'),
+        (None, '5/subpages_tree/?other_author=1&other_author=3', 200, '{"id":5,"author":{"id":2,"username":"User1"},"title":"Page_4","is_public":true,"subpages":[{"id":8,"author":{"id":1,"username":"User0"},"title":"Page_7","is_public":true,"subpages":[]},{"id":7,"author":{"id":2,"username":"User1"},"title":"Page_6","is_public":true,"subpages":[]},{"id":6,"author":{"id":2,"username":"User1"},"title":"Page_5","is_public":true,"subpages":[]}]}'),
+    ])
+    def test_get_subpages_tree_with_authors_list_filter(self, username, address, status, resp):
+        if username:
+            self.login(username)
+        response = self.client.get(self.url+address, format='json')
         assert response.status_code == status
         assert response.content.decode('utf-8') == resp
 

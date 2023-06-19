@@ -1,4 +1,5 @@
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Q
 from rest_framework import serializers
 
 from .models import Road
@@ -47,3 +48,31 @@ class ShortRoadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Road
         fields = ['id', 'title']
+
+
+class RoadsTreeSerializer(serializers.ModelSerializer):
+    subroads = serializers.SerializerMethodField()
+    author = UserShortSerializer()
+
+    class Meta:
+        model = Road
+        fields = ("id", "author", "page", "title", "is_public", "subroads")
+
+    def get_subroads(self, instance):
+        origin_author = self.context['origin_author']
+        user = self.context['user']
+        other_author_list = self.context['other_author_list']
+        subroads = instance.subroad.all()
+        if len(subroads) == 0:
+            return []
+
+        if user.is_anonymous:
+            subroads = subroads.filter(Q(is_public=True) & (Q(author=origin_author) | Q(author__in=other_author_list)))
+        elif user == origin_author:
+            subroads = subroads.filter(Q(author=user) | (Q(is_public=True) & Q(author__in=other_author_list)))
+        else:
+            subroads = subroads.filter((Q(is_public=True) & (Q(author=origin_author) | Q(author__in=other_author_list)))
+                                       | Q(author=user))
+        return RoadsTreeSerializer(subroads, many=True, context=self.context).data
+
+

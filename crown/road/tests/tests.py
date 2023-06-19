@@ -156,3 +156,42 @@ class TestRoad(APITestCase):
         response = self.client.get(self.url+road_id+'/', format='json')
         assert response.status_code == status
         assert response.content.decode('utf-8') == resp
+
+    @parameterized.expand([
+        (None, '8/roads_tree/', 401, '{"detail":"Учетные данные не были предоставлены."}'),
+        (None, '2/roads_tree/', 401, '{"detail":"Учетные данные не были предоставлены."}'),
+        ('User0', '8/roads_tree/', 403, '{"detail":"Доступ разрешен только автору."}'),
+        ('User0', '4/roads_tree/', 403, '{"detail":"Доступ разрешен только автору."}'),
+        (None, '3/roads_tree/', 200, '{"id":1,"author":{"id":1,"username":"User0"},"page":1,"title":"Дорога","is_public":true,"subroads":[{"id":3,"author":{"id":1,"username":"User0"},"page":1,"title":"Alt2","is_public":true,"subroads":[]}]}'),
+        (None, '3/roads_tree/?other_author=2', 200, '{"id":1,"author":{"id":1,"username":"User0"},"page":1,"title":"Дорога","is_public":true,"subroads":[{"id":3,"author":{"id":1,"username":"User0"},"page":1,"title":"Alt2","is_public":true,"subroads":[]},{"id":5,"author":{"id":2,"username":"User1"},"page":1,"title":"Alt4","is_public":true,"subroads":[{"id":6,"author":{"id":2,"username":"User1"},"page":1,"title":"Alt5","is_public":true,"subroads":[]}]}]}'),
+        (None, '3/roads_tree/?other_author=3', 200, '{"id":1,"author":{"id":1,"username":"User0"},"page":1,"title":"Дорога","is_public":true,"subroads":[{"id":3,"author":{"id":1,"username":"User0"},"page":1,"title":"Alt2","is_public":true,"subroads":[]}]}'),
+        (None, '3/roads_tree/?other_author=2&other_author=3', 200, '{"id":1,"author":{"id":1,"username":"User0"},"page":1,"title":"Дорога","is_public":true,"subroads":[{"id":3,"author":{"id":1,"username":"User0"},"page":1,"title":"Alt2","is_public":true,"subroads":[]},{"id":5,"author":{"id":2,"username":"User1"},"page":1,"title":"Alt4","is_public":true,"subroads":[{"id":6,"author":{"id":2,"username":"User1"},"page":1,"title":"Alt5","is_public":true,"subroads":[{"id":7,"author":{"id":3,"username":"User2"},"page":1,"title":"Alt5","is_public":true,"subroads":[]}]}]}]}'),
+        ('User1', '4/roads_tree/', 200, '{"id":1,"author":{"id":1,"username":"User0"},"page":1,"title":"Дорога","is_public":true,"subroads":[{"id":3,"author":{"id":1,"username":"User0"},"page":1,"title":"Alt2","is_public":true,"subroads":[]},{"id":4,"author":{"id":2,"username":"User1"},"page":1,"title":"Alt3","is_public":false,"subroads":[]},{"id":5,"author":{"id":2,"username":"User1"},"page":1,"title":"Alt4","is_public":true,"subroads":[{"id":6,"author":{"id":2,"username":"User1"},"page":1,"title":"Alt5","is_public":true,"subroads":[]}]}]}'),
+        ('User0', '4/roads_tree/', 403, '{"detail":"Доступ разрешен только автору."}'),
+        ('User0', '3/roads_tree/', 200, '{"id":1,"author":{"id":1,"username":"User0"},"page":1,"title":"Дорога","is_public":true,"subroads":[{"id":2,"author":{"id":1,"username":"User0"},"page":1,"title":"Alt","is_public":false,"subroads":[]},{"id":3,"author":{"id":1,"username":"User0"},"page":1,"title":"Alt2","is_public":true,"subroads":[]}]}'),
+        ('User2', '1/roads_tree/', 200, '{"id":1,"author":{"id":1,"username":"User0"},"page":1,"title":"Дорога","is_public":true,"subroads":[{"id":3,"author":{"id":1,"username":"User0"},"page":1,"title":"Alt2","is_public":true,"subroads":[]}]}'),
+        ('User2', '1/roads_tree/?other_author=2', 200, '{"id":1,"author":{"id":1,"username":"User0"},"page":1,"title":"Дорога","is_public":true,"subroads":[{"id":3,"author":{"id":1,"username":"User0"},"page":1,"title":"Alt2","is_public":true,"subroads":[]},{"id":5,"author":{"id":2,"username":"User1"},"page":1,"title":"Alt4","is_public":true,"subroads":[{"id":6,"author":{"id":2,"username":"User1"},"page":1,"title":"Alt5","is_public":true,"subroads":[{"id":7,"author":{"id":3,"username":"User2"},"page":1,"title":"Alt5","is_public":true,"subroads":[]}]}]}]}'),
+        ('User2', '1/roads_tree/?other_author=2rt', 400, '{"parent":["Некорректный id автора"]}'),
+        ('User2', '1/roads_tree/?other_author=22', 200, '{"id":1,"author":{"id":1,"username":"User0"},"page":1,"title":"Дорога","is_public":true,"subroads":[{"id":3,"author":{"id":1,"username":"User0"},"page":1,"title":"Alt2","is_public":true,"subroads":[]}]}'),
+        ('User2', '8/roads_tree/', 200, '{"id":8,"author":{"id":3,"username":"User2"},"page":2,"title":"Дорога","is_public":false,"subroads":[]}'),
+    ])
+    def test_get_roads_tree(self, username, address, status, resp):
+        if username:
+            self.login(username)
+        response = self.client.get(self.url + address, format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp
+
+    @parameterized.expand([
+        (None, '/page/1/roads_tree/', 200, '{"id":1,"author":{"id":1,"username":"User0"},"page":1,"title":"Дорога","is_public":true,"subroads":[{"id":3,"author":{"id":1,"username":"User0"},"page":1,"title":"Alt2","is_public":true,"subroads":[]},{"id":5,"author":{"id":2,"username":"User1"},"page":1,"title":"Alt4","is_public":true,"subroads":[{"id":6,"author":{"id":2,"username":"User1"},"page":1,"title":"Alt5","is_public":true,"subroads":[{"id":7,"author":{"id":3,"username":"User2"},"page":1,"title":"Alt5","is_public":true,"subroads":[]}]}]}]}'),
+        (None, '/page/2/roads_tree/', 401, '{"detail":"Учетные данные не были предоставлены."}'),
+        ('User0', '/page/2/roads_tree/', 403, '{"detail":"Доступ разрешен только автору."}'),
+        ('User0', '/page/1/roads_tree/', 200, '{"id":1,"author":{"id":1,"username":"User0"},"page":1,"title":"Дорога","is_public":true,"subroads":[{"id":2,"author":{"id":1,"username":"User0"},"page":1,"title":"Alt","is_public":false,"subroads":[]},{"id":3,"author":{"id":1,"username":"User0"},"page":1,"title":"Alt2","is_public":true,"subroads":[]},{"id":5,"author":{"id":2,"username":"User1"},"page":1,"title":"Alt4","is_public":true,"subroads":[{"id":6,"author":{"id":2,"username":"User1"},"page":1,"title":"Alt5","is_public":true,"subroads":[{"id":7,"author":{"id":3,"username":"User2"},"page":1,"title":"Alt5","is_public":true,"subroads":[]}]}]}]}'),
+        ('User2', '/page/1/roads_tree/', 200, '{"id":1,"author":{"id":1,"username":"User0"},"page":1,"title":"Дорога","is_public":true,"subroads":[{"id":3,"author":{"id":1,"username":"User0"},"page":1,"title":"Alt2","is_public":true,"subroads":[]},{"id":5,"author":{"id":2,"username":"User1"},"page":1,"title":"Alt4","is_public":true,"subroads":[{"id":6,"author":{"id":2,"username":"User1"},"page":1,"title":"Alt5","is_public":true,"subroads":[{"id":7,"author":{"id":3,"username":"User2"},"page":1,"title":"Alt5","is_public":true,"subroads":[]}]}]}]}'),
+    ])
+    def test_get_full_roads_tree(self, username, address, status, resp):
+        if username:
+            self.login(username)
+        response = self.client.get(address, format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp

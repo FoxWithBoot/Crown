@@ -12,16 +12,19 @@ from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
 from rest_framework.response import Response
 
-from .controller import get_list_public_authors_in_space
+from .controller import get_list_public_authors_in_space, get_list_public_authors_in_page_roads
 from .filters import PageFilter
 from .models import Page
 
-from .serializers import CreatePageSerializer, DefaultPageSerializer, PagesTreeSerializer, FakePagesTreeSerializer, \
+from .serializers import CreatePageSerializer, DefaultPageSerializer, PagesTreeSerializer, \
     UpdatePageSerializer, MovePageSerializer, ShortPageSerializer
 
 from user.models import User
 from user.serializers import UserShortSerializer
 from crown.permissions import OnlyAuthorIfPrivate
+from road.serializers import RoadsTreeSerializer
+from road.models import Road
+from crown.serializers import FakePagesTreeSerializer, FakeRoadTreeSerializer
 
 
 class PageViewSet(viewsets.ViewSet):
@@ -63,21 +66,38 @@ class PageViewSet(viewsets.ViewSet):
                     опубликованные подстраницы автора вселенной,
                     свои подстраницы в данной вселенной
                     и опубликованные страницы указанного (дополнительного) автора.
+        - Если пользователь - автор страницы, но не автор вселенной и вселенная приватна, то 403.
         """
-
         page = get_object_or_404(Page, pk=pk)
         self.check_object_permissions(request, page)
         parent_page = page.get_root()
-        other_author = request.query_params.get('other_author', None)
+        self.check_object_permissions(request, parent_page)
+        other_author = request.query_params.getlist('other_author', '')
         try:
-            other_author = other_author if User.objects.filter(pk=other_author).exists() else parent_page.author
+            other_author_list = []
+            for i in other_author:
+                if User.objects.filter(pk=i).exists():
+                    other_author_list.append(i)
         except:
             raise ValidationError(detail={"parent": ["Некорректный id автора"]})
         pages_tree = PagesTreeSerializer(parent_page, context={'origin_author': parent_page.author,
                                                                'user': request.user,
-                                                               'other_author': other_author})
-        return Response(pages_tree.data,
-                        status=status.HTTP_200_OK)
+                                                               'other_author_list': other_author_list})
+        return Response(pages_tree.data, status=status.HTTP_200_OK)
+
+    @swagger_auto_schema(responses={200: FakeRoadTreeSerializer()})
+    @action(methods=['get'], detail=True)
+    def roads_tree(self, request, pk):
+        """Возвращает дерево дорог(веток) страницы, включая ветки ВСЕХ публичных авторов."""
+        page = get_object_or_404(Page, pk=pk)
+        self.check_object_permissions(request, page)
+        parent_road = Road.objects.get(page=page, parent=None)
+        authors_page = get_list_public_authors_in_page_roads(page=page, user=request.user, parent_road=parent_road)
+        authors_page = list(authors_page.values_list('id', flat=True))
+        roads_tree = RoadsTreeSerializer(parent_road, context={'origin_author': page.author,
+                                                               'user': request.user,
+                                                               'other_author_list': authors_page})
+        return Response(roads_tree.data, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(responses={200: UserShortSerializer(many=True)})
     @action(methods=['get'], detail=True)

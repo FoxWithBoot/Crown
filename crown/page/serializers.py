@@ -164,7 +164,7 @@ class PagesTreeSerializer(serializers.ModelSerializer):
     def get_subpages(self, instance):
         origin_author = self.context['origin_author']
         user = self.context['user']
-        other_author = self.context['other_author']
+        other_author_list = self.context['other_author_list']
         subpages = instance.subpages.all()
         if len(subpages) == 0:
             return []
@@ -172,34 +172,19 @@ class PagesTreeSerializer(serializers.ModelSerializer):
         if user.is_anonymous:
             """Если пользователь - аноним, то он получит только опубликованные подстраницы автора вселенной
             и опубликованные подстраницы указанного (дополнительного) автора."""
-            subpages = subpages.filter(Q(is_public=True) & (Q(author=origin_author) | Q(author=other_author)))
+            subpages = subpages.filter(Q(is_public=True) & (Q(author=origin_author) | Q(author__in=other_author_list)))
         elif user == origin_author:
             """Если пользователь - это автор вселенной, то он получит свои подстраницы 
             и опубликованные подстраницы указанного (дополнительного) автора."""
-            subpages = subpages.filter(Q(author=user) | (Q(is_public=True) & Q(author=other_author)))
+            subpages = subpages.filter(Q(author=user) | (Q(is_public=True) & Q(author__in=other_author_list)))
         else:
             """Если пользователь авторизован, но это не его вселенная, то он получит
             опубликованные подстраницы автора вселенной, 
             свои подстраницы в данной вселенной
             и опубликованные страницы указанного (дополнительного) автора."""
-            subpages = subpages.filter((Q(is_public=True) & (Q(author=origin_author) | Q(author=other_author)))
+            subpages = subpages.filter((Q(is_public=True) & (Q(author=origin_author) | Q(author__in=other_author_list)))
                                        | Q(author=user))
         subpages = subpages.order_by('floor')
-        print(subpages.values('id', 'title', 'floor'))
         return PagesTreeSerializer(subpages, many=True, context=self.context).data
 
-
-#  =====================================================================================================================
-class FakeRecursiveSerializer(serializers.Serializer):
-    """Рекурсивно проходится по дереву"""
-
-    def to_representation(self, instance):
-        serializer = self.parent.parent.__class__(instance, context=self.context)
-        if serializer.data.get('author') == self.context.get('user').id or serializer.data.get('is_public'):
-            return serializer.data
-
-
-class FakePagesTreeSerializer(PagesTreeSerializer):
-    """Выводит дерево страниц. Нужен для swagger отображения, но соответствует схеме выдач ответа"""
-    subpages = FakeRecursiveSerializer(many=True)
 
