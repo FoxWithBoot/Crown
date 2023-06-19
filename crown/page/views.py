@@ -66,6 +66,8 @@ class PageViewSet(viewsets.ViewSet):
                     опубликованные подстраницы автора вселенной,
                     свои подстраницы в данной вселенной
                     и опубликованные страницы указанного (дополнительного) автора.
+        * Если дополнительный автор(-ы) не указаны, то будет использован список всех авторов,
+        которые писали во вселенной. (ВОЗМОЖНО ПЕРЕДЕЛАТЬ НА ФИЛЬТР ВООБЩЕ ПО ВСЕМ АВТОРАМ ДЛЯ ПРОИЗВОДИТЕЛЬНОСТИ)
         - Если пользователь - автор страницы, но не автор вселенной и вселенная приватна, то 403.
         """
         page = get_object_or_404(Page, pk=pk)
@@ -73,30 +75,47 @@ class PageViewSet(viewsets.ViewSet):
         parent_page = page.get_root()
         self.check_object_permissions(request, parent_page)
         other_author = request.query_params.getlist('other_author', '')
-        try:
-            other_author_list = []
-            for i in other_author:
-                if User.objects.filter(pk=i).exists():
-                    other_author_list.append(i)
-        except:
-            raise ValidationError(detail={"parent": ["Некорректный id автора"]})
+        if len(other_author)>0:
+            try:
+                other_author_list = []
+                for i in other_author:
+                    if User.objects.filter(pk=i).exists():
+                        other_author_list.append(i)
+            except:
+                raise ValidationError(detail={"parent": ["Некорректный id автора"]})
+        else:
+            authors_space = get_list_public_authors_in_space(page=page, user=request.user, parent_page=parent_page)
+            other_author_list = list(authors_space.values_list('id', flat=True))
         pages_tree = PagesTreeSerializer(parent_page, context={'origin_author': parent_page.author,
                                                                'user': request.user,
                                                                'other_author_list': other_author_list})
         return Response(pages_tree.data, status=status.HTTP_200_OK)
 
-    @swagger_auto_schema(responses={200: FakeRoadTreeSerializer()})
+    @swagger_auto_schema(responses={200: FakeRoadTreeSerializer()},
+                         manual_parameters=[Parameter('other_author', IN_QUERY,
+                                                      'Добавляет в дерево дорог интересующего автора',
+                                                      type='int'), ])
     @action(methods=['get'], detail=True)
     def roads_tree(self, request, pk):
-        """Возвращает дерево дорог(веток) страницы, включая ветки ВСЕХ публичных авторов."""
+        """Возвращает дерево дорог(веток) страницы (аналогично subpages_tree)"""
         page = get_object_or_404(Page, pk=pk)
         self.check_object_permissions(request, page)
         parent_road = Road.objects.get(page=page, parent=None)
-        authors_page = get_list_public_authors_in_page_roads(page=page, user=request.user, parent_road=parent_road)
-        authors_page = list(authors_page.values_list('id', flat=True))
+        other_author = request.query_params.getlist('other_author', '')
+        if len(other_author) > 0:
+            try:
+                other_author_list = []
+                for i in other_author:
+                    if User.objects.filter(pk=i).exists():
+                        other_author_list.append(i)
+            except:
+                raise ValidationError(detail={"parent": ["Некорректный id автора"]})
+        else:
+            authors_page = get_list_public_authors_in_page_roads(page=page, user=request.user, parent_road=parent_road)
+            other_author_list = list(authors_page.values_list('id', flat=True))
         roads_tree = RoadsTreeSerializer(parent_road, context={'origin_author': page.author,
                                                                'user': request.user,
-                                                               'other_author_list': authors_page})
+                                                               'other_author_list': other_author_list})
         return Response(roads_tree.data, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(responses={200: UserShortSerializer(many=True)})

@@ -3,9 +3,10 @@ from django.db.models import F, Q
 from road.models import Road
 
 
-def get_list_public_authors_in_space(page, user):
-    parent_page = page.get_root()
-    authors_in_space = parent_page.get_descendants(include_self=True)
+def get_list_public_authors_in_space(page, user, parent_page=None):
+    if not parent_page:
+        parent_page = page.get_root()
+    authors_in_space = parent_page.get_descendants(include_self=True)  #
     if user.is_anonymous:
         authors_in_space = authors_in_space.filter(is_public=True).order_by()
     else:
@@ -18,7 +19,7 @@ def get_list_public_authors_in_space(page, user):
 def get_list_public_authors_in_page_roads(page, user, parent_road=None):
     if not parent_road:
         parent_road = Road.objects.get(page=page, parent=None)
-    authors_in_page = parent_road.get_descendants(include_self=True)
+    authors_in_page = parent_road.get_descendants(include_self=True)  #
     if user.is_anonymous:
         authors_in_page = authors_in_page.filter(is_public=True).order_by()
     else:
