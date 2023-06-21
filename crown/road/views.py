@@ -12,14 +12,11 @@ from crown.permissions import OnlyAuthorIfPrivate
 from user.models import User
 
 from .models import Road
-from .serializers import CreateRoadSerializer, DefaultRoadSerializer, RoadsTreeSerializer
+from .serializers import CreateRoadSerializer, DefaultRoadSerializer, UpdateRoadSerializer
 
 
 class RoadViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly, OnlyAuthorIfPrivate]
-
-    def list(self, request):
-        pass
 
     @swagger_auto_schema(request_body=CreateRoadSerializer, responses={201: DefaultRoadSerializer()})
     def create(self, request):
@@ -39,8 +36,21 @@ class RoadViewSet(viewsets.ViewSet):
         self.check_object_permissions(request, road)
         return Response(DefaultRoadSerializer(road).data, status=status.HTTP_200_OK)
 
-    def partial_update(self, request, pk=None):
-        pass
+    @swagger_auto_schema(request_body=UpdateRoadSerializer(), responses={200: DefaultRoadSerializer()})
+    def partial_update(self, request, pk):
+        """
+        Обновление заголовка ветки и статуса ее публикации.
+        При снятии с публикации корневой ветки снимается с публикации и ее страница.
+        При снятии с публикации ветки (дороги) снимаются с публикации ее ветки-потомки.
+        При публикации ветки публикуются ее предки и страница.
+        Публикация не доступна если, одна из дорог-предков не опубликована и принадлежит другому пользователю.
+        """
+        road = get_object_or_404(Road, pk=pk)
+        self.check_object_permissions(request, road)
+        serializer = UpdateRoadSerializer(data=request.data, context={'user': request.user}, instance=road)
+        serializer.is_valid(raise_exception=True)
+        road = serializer.save()
+        return Response(DefaultRoadSerializer(road).data, status=status.HTTP_200_OK)
 
     def destroy(self, request, pk=None):
         pass

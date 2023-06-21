@@ -114,6 +114,7 @@ class TestRoad(APITestCase):
         ('User0', {}, 400, '{"parent":["Обязательное поле."]}', 0),
         ('User0', {'parent': 1}, 201,
          '{"id":9,"author":{"id":1,"username":"User0"},"page":{"id":1,"title":"Test Page 1"},"ancestry":[{"id":1,"title":"Дорога"},{"id":9,"title":"Дорога"}],"is_public":false,"title":"Дорога","parent":1}', 1),
+        ('User0', {'parent': None}, 400, '{"parent":["Это поле не может быть пустым."]}', 0),
         ('User0', {'parent': 2}, 201,
          '{"id":9,"author":{"id":1,"username":"User0"},"page":{"id":1,"title":"Test Page 1"},"ancestry":[{"id":1,"title":"Дорога"},{"id":2,"title":"Alt"},{"id":9,"title":"Дорога"}],"is_public":false,"title":"Дорога","parent":2}', 1),
         ('User0', {'parent': 5}, 201,
@@ -177,3 +178,72 @@ class TestRoad(APITestCase):
         response = self.client.get(address, format='json')
         assert response.status_code == status
         assert response.content.decode('utf-8') == resp
+
+    @parameterized.expand([
+        (None, '1/', {}, 401, '{"detail":"Учетные данные не были предоставлены."}', 0, 0),
+        ('User2', '1/', {}, 403, '{"detail":"Доступ разрешен только автору."}', 0, 0),
+        ('User2', '1/', {}, 403, '{"detail":"Доступ разрешен только автору."}', 0, 0),
+        ('User0', '11/', {}, 404, '{"detail":"Страница не найдена."}', 0, 0),
+        ('User0', '1/', {'title': 'Альтернатива'}, 200, '{"id":1,"author":{"id":1,"username":"User0"},'
+                                                        '"page":{"id":1,"title":"Test Page 1"},'
+                                                        '"ancestry":[{"id":1,"title":"Альтернатива"}],'
+                                                        '"is_public":true,"title":"Альтернатива","parent":null}', 0, 0),
+        ('User0', '1/', {'title': 'Альтерна'*100}, 400,
+         '{"title":["Убедитесь, что это значение содержит не более 150 символов."]}', 0, 0),
+        ('User1', '4/', {'title': 'Альтернатива'}, 200, '{"id":4,"author":{"id":2,"username":"User1"},'
+                                                        '"page":{"id":1,"title":"Test Page 1"},'
+                                                        '"ancestry":[{"id":1,"title":"Дорога"},{"id":4,"title":"Альтернатива"}],'
+                                                        '"is_public":false,"title":"Альтернатива","parent":1}', 0, 0),
+        ('User2', '4/', {'title': 'Альтернатива'}, 403, '{"detail":"Доступ разрешен только автору."}', 0, 0),
+        # --------------------------------------------------------------------------------------------------------------
+        ('User0', '2/', {'is_public': True}, 200, '{"id":2,"author":{"id":1,"username":"User0"},'
+                                                  '"page":{"id":1,"title":"Test Page 1"},'
+                                                  '"ancestry":[{"id":1,"title":"Дорога"},{"id":2,"title":"Alt"}],'
+                                                  '"is_public":true,"title":"Alt","parent":1}', 6, 1),
+        ('User2', '8/', {'is_public': True}, 200, '{"id":8,"author":{"id":3,"username":"User2"},'
+                                                  '"page":{"id":2,"title":"Страница"},'
+                                                  '"ancestry":[{"id":8,"title":"Дорога"}],'
+                                                  '"is_public":true,"title":"Дорога","parent":null}', 6, 2),
+        ('User0', '1/', {'is_public': True}, 200, '{"id":1,"author":{"id":1,"username":"User0"},'
+                                                  '"page":{"id":1,"title":"Test Page 1"},'
+                                                  '"ancestry":[{"id":1,"title":"Дорога"}],'
+                                                  '"is_public":true,"title":"Дорога","parent":null}', 5, 1),
+        ('User0', '1/', {'is_public': False}, 200, '{"id":1,"author":{"id":1,"username":"User0"},'
+                                                   '"page":{"id":1,"title":"Test Page 1"},'
+                                                   '"ancestry":[{"id":1,"title":"Дорога"}],'
+                                                   '"is_public":false,"title":"Дорога","parent":null}', 8, 2),
+        ('User0', '4/', {'is_public': True}, 403, '{"detail":"Доступ разрешен только автору."}', 5, 1),
+        ('User1', '4/', {'is_public': True}, 200, '{"id":4,"author":{"id":2,"username":"User1"},'
+                                                  '"page":{"id":1,"title":"Test Page 1"},'
+                                                  '"ancestry":[{"id":1,"title":"Дорога"},{"id":4,"title":"Alt3"}],'
+                                                  '"is_public":true,"title":"Alt3","parent":1}', 6, 1),
+        ('User2', '4/', {'is_public': True}, 403, '{"detail":"Доступ разрешен только автору."}', 5, 1),
+        ('User1', '5/', {'is_public': False}, 200, '{"id":5,"author":{"id":2,"username":"User1"},'
+                                                   '"page":{"id":1,"title":"Test Page 1"},'
+                                                   '"ancestry":[{"id":1,"title":"Дорога"},{"id":5,"title":"Alt4"}],'
+                                                   '"is_public":false,"title":"Alt4","parent":1}', 7, 1),
+        ('User2', '7/?pz', {'is_public': True}, 400,
+         '{"is_public":["Автор одной из родительских веток отменил публикацию."]}', 2, 1),
+        ('User1', '6/?pz', {'is_public': True}, 200, '{"id":6,"author":{"id":2,"username":"User1"},'
+                                                     '"page":{"id":1,"title":"Test Page 1"},'
+                                                     '"ancestry":[{"id":1,"title":"Дорога"},{"id":5,"title":"Alt4"},{"id":6,"title":"Alt5"}],'
+                                                     '"is_public":true,"title":"Alt5","parent":5}', 4, 1),
+        # --------------------------------------------------------------------------------------------------------------
+        ('User2', '8/', {'is_public': True,
+                         'title': 'Корень'}, 200, '{"id":8,"author":{"id":3,"username":"User2"},'
+                                                  '"page":{"id":2,"title":"Страница"},'
+                                                  '"ancestry":[{"id":8,"title":"Корень"}],'
+                                                  '"is_public":true,"title":"Корень","parent":null}', 6, 2),
+    ])
+    def test_update_road(self, username, address, data, status, resp, count_r, count_p):
+        if address == '7/?pz' or address == '6/?pz':
+            self.login('User1')
+            self.client.patch(self.url + '5/', {'is_public': False}, format='json')
+        if username:
+            self.login(username)
+        response = self.client.patch(self.url + address, data, format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp
+        if data.get('is_public', None):
+            assert Road.objects.filter(is_public=data.get('is_public')).count() == count_r
+            assert Page.objects.filter(is_public=data.get('is_public')).count() == count_p

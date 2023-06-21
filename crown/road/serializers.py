@@ -30,6 +30,31 @@ class CreateRoadSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Такой ветки не существует")
 
 
+class UpdateRoadSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Road
+        fields = ['title', 'is_public']
+
+    def validate_is_public(self, value):
+        author = self.context['user']
+        road = self.instance
+        ancestry = road.get_ancestors()
+        if value and ancestry.filter(Q(is_public=False) & ~Q(author=author)).exists():
+            raise serializers.ValidationError("Автор одной из родительских веток отменил публикацию.")
+        return value
+
+    def update(self, instance, validated_data):
+        title = validated_data.get('title', None)
+        is_public = validated_data.get('is_public', None)
+        if title is not None and title != instance.title:
+            instance.title = title
+            instance.save()
+        if is_public is not None and is_public != instance.is_public:
+            instance = instance.change_public_state(is_public)
+        return instance
+
+
 class DefaultRoadSerializer(serializers.ModelSerializer):
     author = UserShortSerializer()
     page = ShortPageSerializer()

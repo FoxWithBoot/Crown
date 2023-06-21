@@ -35,5 +35,21 @@ class Road(MPTTModel, AbstractAuthorsObj):
             from block.models import Block
             Block.objects.create(road=instance, is_start=True, content="<p>Давай начнем писать;)</p>")
 
+    def change_public_state(self, is_public):
+        if is_public:
+            roads = self.get_ancestors(include_self=True)
+        else:
+            roads = self.get_descendants(include_self=True)
+        roads.update(is_public=is_public)
+        if is_public:
+            """Если ветку публикуем, то публикуем и ее страницу."""
+            if not self.page.is_public:
+                self.page.change_public_state(is_public)
+        if not is_public and not self.parent:
+            """Если ветку приватим и это корневая ветка, то приватим и страницу."""
+            self.page.change_public_state(is_public)
+        self.refresh_from_db()
+        return self
+
 
 post_save.connect(Road.post_create, sender=Road)
