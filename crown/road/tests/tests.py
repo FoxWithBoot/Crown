@@ -247,3 +247,22 @@ class TestRoad(APITestCase):
         if data.get('is_public', None):
             assert Road.objects.filter(is_public=data.get('is_public')).count() == count_r
             assert Page.objects.filter(is_public=data.get('is_public')).count() == count_p
+
+    @parameterized.expand([
+        (None, '/page/1/other_authors_in_page/', 200, '[{"id":1,"username":"User0"},{"id":2,"username":"User1"},{"id":3,"username":"User2"}]'),
+        ('User0', '/page/1/other_authors_in_page/', 200, '[{"id":1,"username":"User0"},{"id":2,"username":"User1"},{"id":3,"username":"User2"}]'),
+        ('User0', '/page/2/other_authors_in_page/', 403, '{"detail":"Доступ разрешен только автору."}'),
+        (None, '/page/2/other_authors_in_page/', 401, '{"detail":"Учетные данные не были предоставлены."}'),
+        ('User1', '/page/22/other_authors_in_page/', 404, '{"detail":"Страница не найдена."}'),
+        (None, '/page/1/other_authors_in_page/?pz', 200, '[{"id":1,"username":"User0"},{"id":2,"username":"User1"}]'),
+        ('User1', '/page/1/other_authors_in_page/?pz', 200, '[{"id":1,"username":"User0"},{"id":2,"username":"User1"}]'),
+        ('User2', '/page/1/other_authors_in_page/?pz', 200, '[{"id":1,"username":"User0"},{"id":2,"username":"User1"},{"id":3,"username":"User2"}]'),
+    ])
+    def test_get_list_authors_in_page(self, username, address, status, resp):
+        if address == '/page/1/other_authors_in_page/?pz':
+            Road.objects.get(pk=7).change_public_state(False)
+        if username:
+            self.login(username)
+        response = self.client.get(address, format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp

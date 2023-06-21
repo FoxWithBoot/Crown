@@ -111,7 +111,7 @@ class PageViewSet(viewsets.ViewSet):
             except:
                 raise ValidationError(detail={"parent": ["Некорректный id автора"]})
         else:
-            authors_page = get_list_public_authors_in_page_roads(page=page, user=request.user, parent_road=parent_road)
+            authors_page = get_list_public_authors_in_page_roads(page=page, user=request.user)
             other_author_list = list(authors_page.values_list('id', flat=True))
         roads_tree = RoadsTreeSerializer(parent_road, context={'origin_author': page.author,
                                                                'user': request.user,
@@ -121,12 +121,27 @@ class PageViewSet(viewsets.ViewSet):
     @swagger_auto_schema(responses={200: UserShortSerializer(many=True)})
     @action(methods=['get'], detail=True)
     def other_authors_list(self, request, pk):
-        """Возвращает список пользователей, которые создавали и публиковали страницы в пределах вселенной страницы pk.
-        Нужен для фильтрации дерева страниц по пользователям (см. subpages_tree)"""
+        """
+        Возвращает список пользователей, которые создавали и публиковали страницы в пределах вселенной страницы pk.
+        Нужен для фильтрации дерева страниц по пользователям (см. subpages_tree)
+        """
         page = get_object_or_404(Page, pk=pk)
         self.check_object_permissions(request, page)
         authors_in_space = get_list_public_authors_in_space(page, request.user)
         authors_list = UserShortSerializer(authors_in_space, many=True)
+        return Response(authors_list.data, status=status.HTTP_200_OK)
+
+    @swagger_auto_schema(responses={200: UserShortSerializer(many=True)})
+    @action(methods=['get'], detail=True)
+    def other_authors_in_page(self, request, pk):
+        """
+        Возвращает список пользователей, которые создавали и публиковали ветки(дороги) в пределах страницы pk.
+        Нужен для фильтрации дерева дорог по пользователям (см. roads_tree)
+        """
+        page = get_object_or_404(Page, pk=pk)
+        self.check_object_permissions(request, page)
+        authors_in_page = get_list_public_authors_in_page_roads(page=page, user=request.user)
+        authors_list = UserShortSerializer(authors_in_page, many=True)
         return Response(authors_list.data, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(request_body=UpdatePageSerializer, responses={200: DefaultPageSerializer()})

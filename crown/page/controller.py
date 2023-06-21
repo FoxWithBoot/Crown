@@ -16,10 +16,8 @@ def get_list_public_authors_in_space(page, user, parent_page=None):
     return authors_in_space
 
 
-def get_list_public_authors_in_page_roads(page, user, parent_road=None):
-    if not parent_road:
-        parent_road = Road.objects.get(page=page, parent=None)
-    authors_in_page = parent_road.get_descendants(include_self=True)  #
+def get_list_public_authors_in_page_roads(page, user):
+    authors_in_page = Road.objects.filter(page=page)
     if user.is_anonymous:
         authors_in_page = authors_in_page.filter(is_public=True).order_by()
     else:
