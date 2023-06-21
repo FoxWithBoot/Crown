@@ -52,5 +52,15 @@ class RoadViewSet(viewsets.ViewSet):
         road = serializer.save()
         return Response(DefaultRoadSerializer(road).data, status=status.HTTP_200_OK)
 
-    def destroy(self, request, pk=None):
-        pass
+    def destroy(self, request, pk):
+        """
+        Полное удаление ветки.
+        Если удаляется корневая ветка, то безвозвратно удаляется и вся страница.
+        """
+        road = get_object_or_404(Road, pk=pk)
+        self.check_object_permissions(request, road)
+        if road.parent is None:
+            road.page.delete()
+        else:
+            road.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

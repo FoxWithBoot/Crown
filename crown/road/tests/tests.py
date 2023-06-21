@@ -266,3 +266,23 @@ class TestRoad(APITestCase):
         response = self.client.get(address, format='json')
         assert response.status_code == status
         assert response.content.decode('utf-8') == resp
+
+    @parameterized.expand([
+        (None, '3/', 401, '{"detail":"Учетные данные не были предоставлены."}', 0, 0, 0),
+        ('User1', '3/', 403, '{"detail":"Доступ разрешен только автору."}', 0, 0, 0),
+        ('User0', '3/', 204, '', 0, 1, 4),
+        ('User1', '5/', 204, '', 0, 3, 6),
+        ('User1', '4/', 204, '', 0, 1, 2),
+        ('User2', '4/', 403, '{"detail":"Доступ разрешен только автору."}', 0, 0, 0),
+        ('User2', '8/', 204, '', 1, 1, 1),
+        ('User0', '1/', 204, '', 1, 7, 20),
+    ])
+    def test_delete_road(self, username, address, status, resp, cp, cr, cb):
+        if username:
+            self.login(username)
+        response = self.client.delete(self.url + address, format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp
+        assert Page.objects.count() == 2 - cp
+        assert Road.objects.count() == 8 - cr
+        assert Block.objects.count() == 21 - cb
