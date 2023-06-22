@@ -4,7 +4,7 @@ from mptt.fields import TreeForeignKey
 from mptt.models import MPTTModel
 
 from page.models import Page
-from crown.models import AbstractAuthorsObj
+from crown.models import AbstractAuthorsObj, SoftDeleteManager
 
 
 class Road(MPTTModel, AbstractAuthorsObj):
@@ -20,6 +20,8 @@ class Road(MPTTModel, AbstractAuthorsObj):
                             null=True, blank=True,
                             related_name="subroad",
                             verbose_name="Дорога, от которой пошла развилка")
+
+    objects = SoftDeleteManager()
 
     class Meta:
         verbose_name = "Дорога"

@@ -286,3 +286,35 @@ class TestRoad(APITestCase):
         assert Page.objects.count() == 2 - cp
         assert Road.objects.count() == 8 - cr
         assert Block.objects.count() == 21 - cb
+
+    @parameterized.expand([
+        (None, '/roads-writer-list/', 401, '{"detail":"Учетные данные не были предоставлены."}', False),
+        ('User1', '/roads-writer-list/', 200,
+         '[{"id":4,"author":{"id":2,"username":"User1"},"page":{"id":1,"title":"Test Page 1"},'
+         '"ancestry":[{"id":1,"title":"Дорога"},{"id":4,"title":"Alt3"}],"is_public":false,"title":"Alt3","parent":1},'
+         '{"id":5,"author":{"id":2,"username":"User1"},"page":{"id":1,"title":"Test Page 1"},'
+         '"ancestry":[{"id":1,"title":"Дорога"},{"id":5,"title":"Alt4"}],"is_public":true,"title":"Alt4","parent":1}]', False),
+        ('User2', '/roads-writer-list/', 200,
+         '[{"id":7,"author":{"id":3,"username":"User2"},"page":{"id":1,"title":"Test Page 1"},'
+         '"ancestry":[{"id":1,"title":"Дорога"},{"id":5,"title":"Alt4"},{"id":6,"title":"Alt5"},{"id":7,"title":"Alt5"}],'
+         '"is_public":true,"title":"Alt5","parent":6}]', False),
+        ('User1', '/roads-writer-list/?is_public=False', 200,
+         '[{"id":4,"author":{"id":2,"username":"User1"},"page":{"id":1,"title":"Test Page 1"},'
+         '"ancestry":[{"id":1,"title":"Дорога"},{"id":4,"title":"Alt3"}],"is_public":false,"title":"Alt3","parent":1}]', False),
+        ('User0', '/roads-writer-list/', 200, '[]', False),
+        ('User0', '/roads-writer-list/', 200, '[]', True),
+        ('User2', '/roads-writer-list/', 200,
+         '[{"id":7,"author":{"id":3,"username":"User2"},"page":{"id":1,"title":"Test Page 1"},'
+         '"ancestry":[{"id":1,"title":"Дорога"},{"id":5,"title":"Alt4"},{"id":6,"title":"Alt5"},{"id":7,"title":"Alt5"}],'
+         '"is_public":true,"title":"Alt5","parent":6}]', True),
+        ('User2', '/roads-writer-list/?is_removed=False', 200, '[]', True),
+        ('User2', '/roads-writer-list/?parent__author=1', 200, '[]', True),
+    ])
+    def test_roads_list(self, username, address, status, resp, sdel):
+        if sdel:
+            Page.objects.get(pk=1).soft_delete()
+        if username:
+            self.login(username)
+        response = self.client.get(address, format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp

@@ -1,11 +1,15 @@
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from rest_framework.filters import OrderingFilter
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.openapi import Parameter, IN_QUERY
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
-from rest_framework import viewsets, status
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework import viewsets, status, mixins
+from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
 
 from crown.serializers import FakeRoadTreeSerializer
 from crown.permissions import OnlyAuthorIfPrivate
@@ -64,3 +68,20 @@ class RoadViewSet(viewsets.ViewSet):
         else:
             road.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RoadWriterList(mixins.ListModelMixin, viewsets.GenericViewSet):
+    """
+    Выдает список дорог(веток) пользователя на чужих страницах.
+    Фильтрация по странице, автору страницы, публичности, автору родительской ветки, удаленности.
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = DefaultRoadSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ['page', 'page__author', 'is_public', 'parent__author', 'is_removed']
+    search_fields = ['^title']
+    ordering_fields = ['title']
+
+    def get_queryset(self):
+        user = self.request.user
+        return Road.objects.all_pages().filter(Q(author=user) & ~Q(parent__author=user) & ~Q(parent=None))
