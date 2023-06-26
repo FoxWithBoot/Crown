@@ -224,6 +224,6 @@ class PagesWriterList(mixins.ListModelMixin, viewsets.GenericViewSet):
         user = self.request.user
         if 'is_removed' not in self.request.query_params:
             return Page.objects.filter(author=user)
-        return Page.objects.all_pages().filter(author=user)
+        return Page.objects.all_obj().filter(author=user)
 
 

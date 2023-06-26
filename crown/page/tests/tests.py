@@ -394,7 +394,7 @@ class TestPage(APITestCase):
         response = self.client.delete(self.url + address2 + '/', format='json')
         assert response.status_code == status
         assert response.content.decode('utf-8') == resp
-        assert Page.objects.all_pages().count() == self.count - count
+        assert Page.objects.all_obj().count() == self.count - count
 
     @parameterized.expand([
         (1, None, '1', 401, '{"detail":"Учетные данные не были предоставлены."}', 5),

@@ -84,4 +84,4 @@ class RoadWriterList(mixins.ListModelMixin, viewsets.GenericViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        return Road.objects.all_pages().filter(Q(author=user) & ~Q(parent__author=user) & ~Q(parent=None))
+        return Road.objects.all_obj().filter(Q(author=user) & ~Q(parent__author=user) & ~Q(parent=None))

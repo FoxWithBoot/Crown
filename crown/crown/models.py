@@ -10,7 +10,7 @@ class SoftDeleteManager(models.Manager):
     def removed(self):
         return super().get_queryset().filter(is_removed=True)
 
-    def all_pages(self):
+    def all_obj(self):
         return super().get_queryset()
 
 

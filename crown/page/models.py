@@ -82,10 +82,10 @@ class Page(MPTTModel, AbstractAuthorsObj):
         from road.models import Road
         if not is_removed:
             pages = self.get_ancestors(include_self=True)
-            roads = Road.objects.filter(page__in=list(pages), parent=None)
+            roads = Road.objects.all_obj().filter(page__in=list(pages), parent=None)
         else:
             pages = self.get_descendants(include_self=True)
-            roads = Road.objects.filter(page__in=list(pages))
+            roads = Road.objects.all_obj().filter(page__in=list(pages))
         if not is_removed:
             pages.update(is_removed=is_removed, is_public=False)
             roads.update(is_removed=is_removed, is_public=False)
