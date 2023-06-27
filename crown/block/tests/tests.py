@@ -31,7 +31,7 @@ def draw_blocks_graph(filename):
 
 
 class TestBlock(APITestCase):
-    #url = '/api/v2.2.1/block/'
+    url = '/road/'
     count = 21
 
     @classmethod
@@ -109,39 +109,67 @@ class TestBlock(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION='Bearer ' + token)
 
     @parameterized.expand([
-        ('User1', '/road/2/blocks/', 403, '{"detail":"Доступ разрешен только автору."}'),
-        ('User0', '/road/4/blocks/', 403, '{"detail":"Доступ разрешен только автору."}'),
-        (None, '/road/5/blocks/', 200, '[{"id":15,"content":"Блок 5_1"},{"id":4,"content":"Блок 4"},{"id":5,"content":"Блок 5"},{"id":6,"content":"Блок 6"},{"id":16,"content":"Блок 5_2"}]'),
-        (None, '/road/8/blocks/', 401, '{"detail":"Учетные данные не были предоставлены."}'),
-        ('User2', '/road/8/blocks/', 200, '[{"id":21,"content":"<p>Давай начнем писать;)</p>"}]'),
-        ('User2', '/road/101/blocks/', 404, '{"detail":"Страница не найдена."}'),
+        ('User1', '2/blocks/', 403, '{"detail":"Доступ разрешен только автору."}'),
+        ('User0', '4/blocks/', 403, '{"detail":"Доступ разрешен только автору."}'),
+        (None, '5/blocks/', 200, '[{"id":15,"content":"Блок 5_1"},{"id":4,"content":"Блок 4"},{"id":5,"content":"Блок 5"},{"id":6,"content":"Блок 6"},{"id":16,"content":"Блок 5_2"}]'),
+        (None, '8/blocks/', 401, '{"detail":"Учетные данные не были предоставлены."}'),
+        ('User2', '8/blocks/', 200, '[{"id":21,"content":"<p>Давай начнем писать;)</p>"}]'),
+        ('User2', '101/blocks/', 404, '{"detail":"Страница не найдена."}'),
     ])
     def test_get_blocks_of_road(self, username, address, status, resp):
         if username:
             self.login(username)
-        response = self.client.get(address, format='json')
+        response = self.client.get(self.url+address, format='json')
         assert response.status_code == status
         assert response.content.decode('utf-8') == resp
 
     @parameterized.expand([
-        (None, '/road/1/blocks/', {}, 401, '{"detail":"Учетные данные не были предоставлены."}'),
-        ('User0', '/road/1/blocks/', {'where': {'before_after': 'before', 'block': 1}}, 201, '{"id":22,"content":""}'),
-        ('User0', '/road/1/blocks/', {'content': 'Заголовок', 'where': {'before_after': 'before', 'block': 1}}, 201,
+        (None, '1/blocks/', {}, 401, '{"detail":"Учетные данные не были предоставлены."}'),
+        ('User0', '1/blocks/', {'where': {'before_after': 'before', 'block': 1}}, 201, '{"id":22,"content":""}'),
+        ('User0', '1/blocks/', {'content': 'Заголовок', 'where': {'before_after': 'before', 'block': 1}}, 201,
          '{"id":22,"content":"Заголовок"}'),
-        ('User0', '/road/1/blocks/', {'content': 'Заголовок', 'where': {'before_after': 'before', 'block': 101}}, 400,
+        ('User0', '1/blocks/', {'content': 'Заголовок', 'where': {'before_after': 'before', 'block': 101}}, 400,
          '{"where":{"block":["Такого блока не существует."]}}'),
-        ('User0', '/road/1/blocks/', {'content': 'Заголовок', 'where': {'before_after': 'beforeRR', 'block': 1}}, 400,
+        ('User0', '1/blocks/', {'content': 'Заголовок', 'where': {'before_after': 'beforeRR', 'block': 1}}, 400,
          '{"where":{"before_after":["Значения beforeRR нет среди допустимых вариантов."]}}'),
-        ('User0', '/road/1/blocks/', {'content': 'Заголовок'}, 400, '{"where":["Обязательное поле."]}'),
-        ('User0', '/road/4/blocks/', {'content': 'Заголовок', 'where': {'before_after': 'before', 'block': 4}}, 403,
+        ('User0', '1/blocks/', {'content': 'Заголовок'}, 400, '{"where":["Обязательное поле."]}'),
+        ('User0', '4/blocks/', {'content': 'Заголовок', 'where': {'before_after': 'before', 'block': 4}}, 403,
          '{"detail":"Доступ разрешен только автору."}'),
-        ('User0', '/road/4/blocks/', {'content': 'Заголовок', 'where': {'before_after': 'before', 'block': 1}}, 403,
+        ('User0', '4/blocks/', {'content': 'Заголовок', 'where': {'before_after': 'before', 'block': 1}}, 403,
          '{"detail":"Доступ разрешен только автору."}'),
     ])
     def test_create_block(self, username, address, data, status, resp):
         if username:
             self.login(username)
-        response = self.client.post(address, data, format='json')
+        response = self.client.post(self.url+address, data, format='json')
         assert response.status_code == status
         assert response.content.decode('utf-8') == resp
 
+    @parameterized.expand([
+        (None, '1/blocks/2/', {}, 401, '{"detail":"Учетные данные не были предоставлены."}'),
+        ('User0', '1/blocks/2/', {}, 200, '{"id":2,"content":""}'),
+        ('User0', '1/blocks/2/', {'content': 'Заголовок'}, 200, '{"id":2,"content":"Заголовок"}'),
+        ('User0', '1/blocks/4/', {'content': 'Заголовок'}, 200, '{"id":4,"content":"Заголовок"}'),
+        ('User0', '1/blocks/6/', {'content': 'Заголовок'}, 200, '{"id":6,"content":"Заголовок"}'),
+        # --------------------------------------------------------------------------------------------------------------
+        ('User0', '2/blocks/5/', {'content': 'Заголовок'}, 400, '{"detail":[" Блок вне линии повествования."]}'),
+        # --------------------------------------------------------------------------------------------------------------
+        ('User0', '4/blocks/6/', {'content': 'Заголовок'}, 403, '{"detail":"Доступ разрешен только автору."}'),
+        ('User1', '4/blocks/4/', {'content': 'Заголовок'}, 200, '{"id":22,"content":"Заголовок"}'),
+        ('User1', '4/blocks/6/', {'content': 'Заголовок'}, 200, '{"id":22,"content":"Заголовок"}'),
+        ('User2', '4/blocks/4/', {'content': 'Заголовок'}, 403, '{"detail":"Доступ разрешен только автору."}'),
+        # --------------------------------------------------------------------------------------------------------------
+        ('User1', '5/blocks/4/', {'content': 'Заголовок'}, 200, '{"id":22,"content":"Заголовок"}'),
+        ('User1', '5/blocks/6/', {'content': 'Заголовок'}, 200, '{"id":22,"content":"Заголовок"}'),
+        # --------------------------------------------------------------------------------------------------------------
+        ('User1', '6/blocks/4/', {'content': 'Заголовок'}, 200, '{"id":22,"content":"Заголовок"}'),
+        ('User1', '6/blocks/6/', {'content': 'Заголовок'}, 200, '{"id":22,"content":"Заголовок"}'),
+        ('User1', '6/blocks/15/', {'content': 'Заголовок'}, 200, '{"id":22,"content":"Заголовок"}'),
+        ('User1', '6/blocks/155/', {'content': 'Заголовок'}, 404, '{"detail":"Страница не найдена."}'),
+    ])
+    def test_update_block_content(self, username, address, data, status, resp):
+        if username:
+            self.login(username)
+        response = self.client.patch(self.url+address, data, format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp

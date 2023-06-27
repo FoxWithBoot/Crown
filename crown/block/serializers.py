@@ -1,7 +1,7 @@
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
-from .controller import read_road, create_block
+from .controller import read_road, create_block, update_block_content
 from .models import Block
 
 
@@ -42,6 +42,29 @@ class CreateBlockSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         return create_block(road=self.context['road'], line=validated_data['line'],
                             content=validated_data.get('content', ''), where=validated_data['where'])
+
+
+class UpdateBlockSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Block
+        fields = ['content']
+
+    def validate(self, data):
+        line = read_road(self.context['road'])
+        if self.instance not in line:
+            raise serializers.ValidationError({'detail': ' Блок вне линии повествования.'})
+        data['line'] = line
+        return data
+
+    def update(self, instance, validated_data):
+        content = validated_data.get('content', '')
+        if self.context['road'] == instance.road:
+            instance.content = content
+            instance.save()
+            return instance
+        return update_block_content(block=instance, road=self.context['road'],
+                                    line=validated_data['line'], content=content)
 
 
 class BlockSerializer(serializers.ModelSerializer):

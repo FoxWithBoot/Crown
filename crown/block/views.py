@@ -8,7 +8,8 @@ from crown.permissions import OnlyAuthorIfPrivate
 from road.models import Road
 
 from .controller import read_road
-from .serializers import CreateBlockSerializer, BlockSerializer
+from .models import Block
+from .serializers import CreateBlockSerializer, BlockSerializer, UpdateBlockSerializer
 
 
 class BlockViewSet(viewsets.ViewSet):
@@ -39,11 +40,18 @@ class BlockViewSet(viewsets.ViewSet):
     def retrieve(self, request, pk=None):
         pass
 
-    def update(self, request, pk=None):
-        pass
-
-    def partial_update(self, request, pk=None):
-        pass
+    @swagger_auto_schema(request_body=UpdateBlockSerializer(), responses={200: BlockSerializer()})
+    def partial_update(self, request, pkr, pk):
+        """
+        Обновление текста (контента) блока.
+        """
+        road = get_object_or_404(Road, pk=pkr)
+        block = get_object_or_404(Block, pk=pk)
+        self.check_object_permissions(request, road)
+        serializer = UpdateBlockSerializer(data=request.data, context={'road': road}, instance=block)
+        serializer.is_valid(raise_exception=True)
+        block = serializer.save()
+        return Response(BlockSerializer(block).data, status=status.HTTP_200_OK)
 
     def destroy(self, request, pk=None):
         pass

@@ -99,3 +99,65 @@ def _get_neighbours(line, block):
     if index < len(line) - 1:
         next_block = line[index + 1]
     return pre_block, next_block
+
+
+def update_block_content(block, road, line, content):
+    pre_block, next_block = _get_neighbours(line, block)
+    block_cr = Block.objects.create(road=road, content=content)
+    if pre_block and next_block:  # Есть и пред и след блоки
+        pre_block.next_blocks.add(block_cr)
+        print(f"Добавлена связь {pre_block} -> {block_cr}")
+        block_cr.next_blocks.add(next_block)
+        print(f"Добавлена связь {block_cr} -> {next_block}")
+        if pre_block.road != road and next_block.road != road:  # Если и предыдущий и следующий не с моей дороги
+            pass
+        else:
+            if pre_block.road == road:  # Если пред блок с моей дороги
+                pre_block.next_blocks.remove(block)
+                print(f"Удалена связь {pre_block} -> {block}")
+            if next_block.road == road:  # Если след блок с моей дороги
+                block.next_blocks.remove(next_block)
+                print(f"Удалена связь {block} -> {next_block}")
+    elif not pre_block:  # Нет пред блока
+        block_cr.is_start = True
+        block_cr.save()
+        print(f"Для блока {block_cr} is_start установлено в True")
+        block_cr.next_blocks.add(next_block)
+        print(f"Добавлена связь {block_cr} -> {next_block}")
+        if next_block.road == road:  # След блок с моей дороги
+            block.next_block.remove(next_block)
+            print(f"Удалена связь {block} -> {next_block}")
+    elif not next_block:  # Конец линии
+        pre_block.next_blocks.add(block_cr)
+        print(f"Добавлена связь {pre_block} -> {block_cr}")
+        if pre_block.road == road:  # Если пред блок с моей дороги
+            pre_block.next_blocks.remove(block)
+            print(f"Удалена связь {pre_block} -> {block}")
+
+    _create_connect_with_new_block(block_cr, block, road)
+
+    return block_cr
+
+
+def _create_connect_with_new_block(new_block, old_block, road):
+    list_of_pre_blocks = list(Block.objects.filter(next_blocks__in=[old_block]))
+    list_of_next_blocks = list(old_block.next_blocks.all())
+
+    for b in list_of_next_blocks:
+        #if _check_paternity(road, b.road):
+        if b.road in road.get_descendants():
+            old_block.next_blocks.remove(b)
+            #logging.info(f"Удалена связь {old_block} -> {b}")
+            print(f"Удалена связь {old_block} -> {b}")
+            new_block.next_blocks.add(b)
+            #logging.info(f"Добавлена связь {new_block} -> {b}")
+            print(f"Добавлена связь {new_block} -> {b}")
+
+    for b in list_of_pre_blocks:
+        if b.road in road.get_descendants():
+            b.next_blocks.remove(old_block)
+            #logging.info(f"Удалена связь {b} -> {old_block}")
+            print(f"Удалена связь {b} -> {old_block}")
+            b.next_blocks.add(new_block)
+            #logging.info(f"Добавлена связь {b} -> {new_block}")
+            print(f"Добавлена связь {b} -> {new_block}")

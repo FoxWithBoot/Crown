@@ -8,7 +8,8 @@ from user.models import User
 from page.models import Page
 from road.models import Road
 
-from block.controller import read_road, create_block
+from block.controller import read_road, create_block, update_block_content
+
 
 
 def draw_blocks_graph(filename):
@@ -144,3 +145,21 @@ class TestBlock(APITestCase):
         assert [i.id for i in new_line] == fin_line
         draw_blocks_graph(f'create_new_block_{road}_{where["before_after"]}_{where["block"].id}')
 
+    @parameterized.expand([
+        (4, 4, [13, 14, 3, 22, 5, 6, 7]),
+        (4, 6, [13, 14, 3, 4, 5, 22, 7]),
+        (5, 4, [15, 22, 5, 6, 16]),
+        (5, 6, [15, 4, 5, 22, 16]),
+        (6, 4, [17, 18, 15, 22, 5, 6, 16, 19]),
+        (6, 6, [17, 18, 15, 4, 5, 22, 16, 19]),
+        (6, 15, [17, 18, 22, 4, 5, 6, 16, 19]),
+    ])
+    def test_update_block(self, road, block, fin_line):
+        block = Block.objects.get(pk=block)
+        road = Road.objects.get(pk=road)
+        line = read_road(road)
+        update_block_content(block, road, line, 'content')
+        new_line = read_road(road)
+        assert len(new_line) == len(fin_line)
+        assert [i.id for i in new_line] == fin_line
+        draw_blocks_graph(f'update_block_{block.id}_on_road_{road.id}')
