@@ -1,19 +1,15 @@
 from django.db.models import Q
-from django.shortcuts import get_object_or_404
+from rest_framework.generics import get_object_or_404
 from rest_framework.filters import OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_yasg.openapi import Parameter, IN_QUERY
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 from rest_framework import viewsets, status, mixins
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
 
-from crown.serializers import FakeRoadTreeSerializer
 from crown.permissions import OnlyAuthorIfPrivate
-from user.models import User
 
 from .models import Road
 from .serializers import CreateRoadSerializer, DefaultRoadSerializer, UpdateRoadSerializer

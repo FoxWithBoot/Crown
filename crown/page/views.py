@@ -1,6 +1,6 @@
 from django.db.models import Q
 from django.http import Http404
-from django.shortcuts import get_object_or_404
+from rest_framework.generics import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.openapi import Parameter, IN_QUERY
 from drf_yasg.utils import swagger_auto_schema
