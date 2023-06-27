@@ -45,8 +45,6 @@ class TestBlock(APITestCase):
         r2 = Road.objects.create(page=p1, parent=r1, title="Alt", author=u)
         r3 = Road.objects.create(page=p1, parent=r1, title="Alt2", author=u, is_public=True)
         r4 = Road.objects.create(page=p1, parent=r1, title="Alt3", author=u2)
-        #r4.co_authors.add(u3)
-        #r4.save()
         r5 = Road.objects.create(page=p1, parent=r1, title="Alt4", author=u2, is_public=True)
         r6 = Road.objects.create(page=p1, parent=r5, title="Alt5", author=u2, is_public=True)
         r7 = Road.objects.create(page=p1, parent=r6, title="Alt5", author=u3, is_public=True)
@@ -116,13 +114,34 @@ class TestBlock(APITestCase):
         (None, '/road/5/blocks/', 200, '[{"id":15,"content":"Блок 5_1"},{"id":4,"content":"Блок 4"},{"id":5,"content":"Блок 5"},{"id":6,"content":"Блок 6"},{"id":16,"content":"Блок 5_2"}]'),
         (None, '/road/8/blocks/', 401, '{"detail":"Учетные данные не были предоставлены."}'),
         ('User2', '/road/8/blocks/', 200, '[{"id":21,"content":"<p>Давай начнем писать;)</p>"}]'),
-        ('User2', '/road/blocks/', 404, '{"detail":"Страница не найдена."}'),
         ('User2', '/road/101/blocks/', 404, '{"detail":"Страница не найдена."}'),
     ])
     def test_get_blocks_of_road(self, username, address, status, resp):
         if username:
             self.login(username)
         response = self.client.get(address, format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp
+
+    @parameterized.expand([
+        (None, '/road/1/blocks/', {}, 401, '{"detail":"Учетные данные не были предоставлены."}'),
+        ('User0', '/road/1/blocks/', {'where': {'before_after': 'before', 'block': 1}}, 201, '{"id":22,"content":""}'),
+        ('User0', '/road/1/blocks/', {'content': 'Заголовок', 'where': {'before_after': 'before', 'block': 1}}, 201,
+         '{"id":22,"content":"Заголовок"}'),
+        ('User0', '/road/1/blocks/', {'content': 'Заголовок', 'where': {'before_after': 'before', 'block': 101}}, 400,
+         '{"where":{"block":["Такого блока не существует."]}}'),
+        ('User0', '/road/1/blocks/', {'content': 'Заголовок', 'where': {'before_after': 'beforeRR', 'block': 1}}, 400,
+         '{"where":{"before_after":["Значения beforeRR нет среди допустимых вариантов."]}}'),
+        ('User0', '/road/1/blocks/', {'content': 'Заголовок'}, 400, '{"where":["Обязательное поле."]}'),
+        ('User0', '/road/4/blocks/', {'content': 'Заголовок', 'where': {'before_after': 'before', 'block': 4}}, 403,
+         '{"detail":"Доступ разрешен только автору."}'),
+        ('User0', '/road/4/blocks/', {'content': 'Заголовок', 'where': {'before_after': 'before', 'block': 1}}, 403,
+         '{"detail":"Доступ разрешен только автору."}'),
+    ])
+    def test_create_block(self, username, address, data, status, resp):
+        if username:
+            self.login(username)
+        response = self.client.post(address, data, format='json')
         assert response.status_code == status
         assert response.content.decode('utf-8') == resp
 

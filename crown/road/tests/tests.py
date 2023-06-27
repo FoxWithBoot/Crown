@@ -29,7 +29,7 @@ def draw_roads_graph(filename):
 
 
 class TestRoad(APITestCase):
-    url = '/road/'
+    url = '/roads/'
     count = 8
 
     @classmethod
@@ -43,8 +43,6 @@ class TestRoad(APITestCase):
         r2 = Road.objects.create(page=p1, parent=r1, title="Alt", author=u)
         r3 = Road.objects.create(page=p1, parent=r1, title="Alt2", author=u, is_public=True)
         r4 = Road.objects.create(page=p1, parent=r1, title="Alt3", author=u2)
-        # r4.co_authors.add(u3)
-        # r4.save()
         r5 = Road.objects.create(page=p1, parent=r1, title="Alt4", author=u2, is_public=True)
         r6 = Road.objects.create(page=p1, parent=r5, title="Alt5", author=u2, is_public=True)
         r7 = Road.objects.create(page=p1, parent=r6, title="Alt5", author=u3, is_public=True)

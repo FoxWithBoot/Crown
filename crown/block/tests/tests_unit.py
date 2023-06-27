@@ -8,7 +8,7 @@ from user.models import User
 from page.models import Page
 from road.models import Road
 
-from block.controller import read_road
+from block.controller import read_road, create_block
 
 
 def draw_blocks_graph(filename):
@@ -33,7 +33,6 @@ def draw_blocks_graph(filename):
 
 
 class TestBlock(APITestCase):
-    #url = '/api/v2.2.1/block/'
     count = 21
 
     @classmethod
@@ -122,3 +121,26 @@ class TestBlock(APITestCase):
         blocks = read_road(road)
         assert len(blocks) == len(bls)
         assert [i.id for i in blocks] == bls
+
+    @parameterized.expand([
+        (1, {'block': 1, 'before_after': 'before'}, [22, 1, 2, 3, 4, 5, 6, 7]),
+        (1, {'block': 7, 'before_after': 'after'}, [1, 2, 3, 4, 5, 6, 7, 22]),
+        (1, {'block': 3, 'before_after': 'after'}, [1, 2, 3, 22, 4, 5, 6, 7]),
+        (1, {'block': 4, 'before_after': 'before'}, [1, 2, 3, 22, 4, 5, 6, 7]),
+        (2, {'block': 3, 'before_after': 'after'}, [1, 2, 3, 22, 4, 8, 6, 7]),
+        (2, {'block': 4, 'before_after': 'before'}, [1, 2, 3, 22, 4, 8, 6, 7]),
+        (4, {'block': 3, 'before_after': 'after'}, [13, 14, 3, 22, 4, 5, 6, 7]),
+        (4, {'block': 4, 'before_after': 'before'}, [13, 14, 3, 22, 4, 5, 6, 7]),
+        (7, {'block': 15, 'before_after': 'before'}, [17, 18, 22, 15, 4, 20, 6, 16, 19]),
+        (7, {'block': 18, 'before_after': 'after'}, [17, 18, 22, 15, 4, 20, 6, 16, 19]),
+    ])
+    def test_create_block(self, road, where, fin_line):
+        road = Road.objects.get(pk=road)
+        line = read_road(road)
+        where['block'] = Block.objects.get(pk=where['block'])
+        create_block(road=road, content='', where=where, line=line)
+        new_line = read_road(road)
+        assert len(new_line) == len(fin_line)
+        assert [i.id for i in new_line] == fin_line
+        draw_blocks_graph(f'create_new_block_{road}_{where["before_after"]}_{where["block"].id}')
+
