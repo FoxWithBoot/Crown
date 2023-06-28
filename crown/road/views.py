@@ -1,4 +1,5 @@
 from django.db.models import Q
+from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404
 from rest_framework.filters import OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
@@ -6,13 +7,14 @@ from drf_yasg.utils import swagger_auto_schema
 
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
-from rest_framework import viewsets, status, mixins
+from rest_framework import viewsets, status, mixins, serializers
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
 
 from crown.permissions import OnlyAuthorIfPrivate
 
 from .models import Road
 from .serializers import CreateRoadSerializer, DefaultRoadSerializer, UpdateRoadSerializer
+from block.controller import merge_roads
 
 
 class RoadViewSet(viewsets.ViewSet):
@@ -51,6 +53,23 @@ class RoadViewSet(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
         road = serializer.save()
         return Response(DefaultRoadSerializer(road).data, status=status.HTTP_200_OK)
+
+    def merge(self, request, pk, pk2):
+        """
+        Слияние веток.
+        Вторая ветка должна быть потомком первой.
+        При слиянии двух веток сливаются и все ветки между ними.
+        Вторая ветка должна быть публичной или принадлежать автору первой ветки.
+        """
+        road1 = get_object_or_404(Road, pk=pk)
+        road2 = get_object_or_404(Road, pk=pk2)
+        self.check_object_permissions(request, road1)
+        if not (road2.is_public or road2.author == request.user):
+            return Response({'detail': 'Доступ разрешен только автору.'}, status=status.HTTP_403_FORBIDDEN)
+        if road1 not in road2.get_ancestors():
+            raise serializers.ValidationError({'detail': 'Ветка для слияния не потомок целевой ветки.'})
+        merge_roads(road1, road2)
+        return Response(status=status.HTTP_200_OK)
 
     @swagger_auto_schema(responses={204: ''})
     def destroy(self, request, pk):

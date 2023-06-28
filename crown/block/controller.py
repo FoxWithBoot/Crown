@@ -145,7 +145,6 @@ def _create_connect_with_new_block(new_block, old_block, road):
     list_of_next_blocks = list(old_block.next_blocks.all())
 
     for b in list_of_next_blocks:
-        #if _check_paternity(road, b.road):
         if b.road in road.get_descendants():
             old_block.next_blocks.remove(b)
             #logging.info(f"Удалена связь {old_block} -> {b}")
@@ -180,14 +179,12 @@ def delete_block(road, line, block):
     r = roads.copy()
     for i in roads:
         #  Убрали кузенов
-        #if not (_check_paternity(get_road(i), road) or _check_paternity(road, get_road(i))) and i in r:
         if i not in list(road.get_family()) and i in r:
             r.remove(i)
     roads = r.copy()
     print('Убрали кузенов', roads)
     # Удаляет из списка дорог предков целевой дороги
     for i in roads:
-        #if _check_paternity(get_road(i), road) and i in r:
         if road in list(i.get_descendants()) and i in r:
             r.remove(i)
     roads = r.copy()
@@ -196,7 +193,6 @@ def delete_block(road, line, block):
         for j in roads:
             if i != j:
                 #  Убирает внуков целевой дороги
-                #if _check_paternity(get_road(i), get_road(j)) and j in r:
                 if j in list(i.get_descendants()) and j in r:
                     r.remove(j)
     roads = r.copy()
@@ -205,7 +201,6 @@ def delete_block(road, line, block):
     for r_i in roads:
         r_line = read_road(r_i)
         pre_block, next_block = _get_neighbours(r_line, block)
-        #road_i = get_road(r_i)
         pre_block, next_block = _pre_n_next_blocks_move(r_i, r_line, pre_block, block, next_block)
         _new_pre_n_new_next_blocks_move(r_i, pre_block, block, next_block)
 
@@ -373,3 +368,58 @@ def _new_pre_n_new_next_blocks_move(road, new_pre_block, block, new_next_block):
             new_pre_block.next_blocks.add(block)
             print(f"Добавлена связь {new_pre_block} -> {block}")
     return block
+
+
+def merge_roads(road, m_road):
+    one_line = read_road(road)
+    two_line = read_road(m_road)
+    road_map = list(m_road.get_ancestors(include_self=True))
+    descendants = road.get_descendants()
+
+    for bl in one_line:
+        if not bl in two_line:
+            pre_block, next_block = _get_neighbours(one_line, bl)
+
+            list_roads_id_of_next_blocks = list(Block.objects.filter(next_blocks__in=[bl]).values_list('road', flat=True))
+            list_roads_id_of_pre_blocks = list(bl.next_blocks.all().values_list('road', flat=True))
+            roads_list = list(set(list_roads_id_of_next_blocks + list_roads_id_of_pre_blocks))
+
+            roads = []
+            for i in roads_list:
+                roads.append(Road.objects.get(pk=i))
+
+            for r in road_map:
+                if r in roads:
+                    roads.remove(r)
+            for i in roads:
+                for j in roads:
+                    if i != j:
+                        if j in i.get_descendants():
+                            roads.remove(j)
+
+            if bl.road == road or bl.road in descendants:
+                if pre_block:
+                    pre_block.next_blocks.remove(bl)
+                if next_block:
+                    bl.next_blocks.remove(next_block)
+                one_line[one_line.index(bl)] = None
+                bl.delete()
+
+            for r in roads:
+                r.delete()
+
+    for i in range(len(two_line)):
+        if two_line[i].road != road and two_line[i].road in descendants:
+            two_line[i].road = road
+            two_line[i].save()
+        if i > 0 and two_line[i].is_start:
+            two_line[i].is_start = False
+            two_line[i].save()
+
+    index = road_map.index(road)
+    for i in range(index+1, len(road_map)):
+        Road.objects.filter(parent=road_map[i]).update(parent=road)
+        # if road_map[i].author != road.author: #and \
+        #         #not Road.objects.filter(id=road.id, co_authors=road_map[i].author).exists():
+        #     road.co_authors.add(road_map['road_map'][i].author)
+        road_map[i].delete()

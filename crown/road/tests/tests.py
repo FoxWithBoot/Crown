@@ -29,7 +29,7 @@ def draw_roads_graph(filename):
 
 
 class TestRoad(APITestCase):
-    url = '/roads/'
+    url = '/road/'
     count = 8
 
     @classmethod

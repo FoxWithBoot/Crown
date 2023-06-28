@@ -189,3 +189,33 @@ class TestBlock(APITestCase):
         response = self.client.delete(self.url+address, format='json')
         assert response.status_code == status
         assert response.content.decode('utf-8') == resp
+
+    @parameterized.expand([
+        (None, '1/with_road/1/', 401, '{"detail":"Учетные данные не были предоставлены."}'),
+        ('User0', '1/with_road/1/', 400, '{"detail":"Ветка для слияния не потомок целевой ветки."}'),
+        ('User0', '1/with_road/2/', 200, ''),
+        ('User0', '1/with_road/3/', 200, ''),
+        ('User0', '1/with_road/4/', 403, '{"detail":"Доступ разрешен только автору."}'),
+        ('User0', '1/with_road/5/', 200, ''),
+        ('User0', '1/with_road/6/', 200, ''),
+        ('User0', '1/with_road/7/', 200, ''),
+        ('User0', '1/with_road/8/', 403, '{"detail":"Доступ разрешен только автору."}'),
+        # --------------------------------------------------------------------------------------------------------------
+        ('User0', '3/with_road/2/', 400, '{"detail":"Ветка для слияния не потомок целевой ветки."}'),
+        ('User0', '3/with_road/1/', 400, '{"detail":"Ветка для слияния не потомок целевой ветки."}'),
+        ('User0', '4/with_road/1/', 403, '{"detail":"Доступ разрешен только автору."}'),
+        ('User0', '12/with_road/1/', 404, '{"detail":"Страница не найдена."}'),
+        ('User0', '1/with_road/12/', 404, '{"detail":"Страница не найдена."}'),
+        ('User0', '12/with_road/12/', 404, '{"detail":"Страница не найдена."}'),
+        # --------------------------------------------------------------------------------------------------------------
+        ('User0', '5/with_road/6/', 403, '{"detail":"Доступ разрешен только автору."}'),
+        ('User1', '5/with_road/6/', 200, ''),
+        ('User1', '5/with_road/7/', 200, ''),
+        ('User1', '6/with_road/7/', 200, ''),
+    ])
+    def test_view_merge_roads(self, username, address, status, resp):
+        if username:
+            self.login(username)
+        response = self.client.put(self.url+address, format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp

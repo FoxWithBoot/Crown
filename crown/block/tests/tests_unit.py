@@ -8,8 +8,7 @@ from user.models import User
 from page.models import Page
 from road.models import Road
 
-from block.controller import read_road, create_block, update_block_content, delete_block
-
+from block.controller import read_road, create_block, update_block_content, delete_block, merge_roads
 
 
 def draw_blocks_graph(filename):
@@ -196,3 +195,25 @@ class TestBlock(APITestCase):
         assert len(new_line) == len(fin_line)
         assert [i.id for i in new_line] == fin_line
         draw_blocks_graph(f'delete_block_{bl}_on_road_{rd}')
+
+    @parameterized.expand([
+        (1, 2, [1, 2, 3, 4, 8, 6, 7], 1, 1),
+        (1, 3, [1, 2, 3, 9, 10, 11, 12], 5, 11),
+        (1, 5, [15, 4, 5, 6, 16], 3, 10),
+        (1, 6, [17, 18, 15, 4, 5, 6, 16, 19], 4, 10),
+        (1, 7, [17, 18, 15, 4, 20, 6, 16, 19], 5, 11),
+        (5, 6, [17, 18, 15, 4, 5, 6, 16, 19], 1, 0),
+        (5, 7, [17, 18, 15, 4, 20, 6, 16, 19], 2, 0),
+        (6, 7, [17, 18, 15, 4, 20, 6, 16, 19], 1, 0),
+    ])
+    def test_merge_roads(self, r1, r2, bls, cr, cb):
+        road1 = Road.objects.get(pk=r1)
+        road2 = Road.objects.get(pk=r2)
+        merge_roads(road1, road2)
+        blocks = read_road(Road.objects.get(pk=r1))
+        assert len(blocks) == len(bls)
+        assert [i.id for i in blocks] == bls
+        assert Road.objects.count() == 8 - cr
+        assert Block.objects.count() == self.count - cb
+        draw_blocks_graph(f'merge_road_{r1}_with_{r2}')
+
