@@ -173,3 +173,19 @@ class TestBlock(APITestCase):
         response = self.client.patch(self.url+address, data, format='json')
         assert response.status_code == status
         assert response.content.decode('utf-8') == resp
+
+    @parameterized.expand([
+        (None, '1/blocks/2/', 401, '{"detail":"Учетные данные не были предоставлены."}'),
+        ('User1', '1/blocks/2/', 403, '{"detail":"Доступ разрешен только автору."}'),
+        ('User0', '1/blocks/202/', 404, '{"detail":"Страница не найдена."}'),
+        ('User0', '1/blocks/1/', 204, ''),
+        ('User0', '1/blocks/3/', 204, ''),
+        ('User1', '4/blocks/3/', 204, ''),
+        ('User0', '1/blocks/8/', 400, '{"detail":" Блок вне линии повествования."}'),
+    ])
+    def test_delete_block(self, username, address, status, resp):
+        if username:
+            self.login(username)
+        response = self.client.delete(self.url+address, format='json')
+        assert response.status_code == status
+        assert response.content.decode('utf-8') == resp

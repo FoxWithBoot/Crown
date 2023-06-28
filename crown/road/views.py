@@ -52,6 +52,7 @@ class RoadViewSet(viewsets.ViewSet):
         road = serializer.save()
         return Response(DefaultRoadSerializer(road).data, status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(responses={204: ''})
     def destroy(self, request, pk):
         """
         Полное удаление ветки.

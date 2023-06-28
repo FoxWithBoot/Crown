@@ -1,15 +1,15 @@
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.generics import get_object_or_404
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 from crown.permissions import OnlyAuthorIfPrivate
 from road.models import Road
 
-from .controller import read_road
+from .controller import read_road, delete_block
 from .models import Block
-from .serializers import CreateBlockSerializer, BlockSerializer, UpdateBlockSerializer
+from .serializers import CreateBlockSerializer, BlockSerializer, UpdateBlockSerializer, FullBlockSerializer
 
 
 class BlockViewSet(viewsets.ViewSet):
@@ -37,9 +37,6 @@ class BlockViewSet(viewsets.ViewSet):
         block = serializer.save()
         return Response(BlockSerializer(block).data, status=status.HTTP_201_CREATED)
 
-    def retrieve(self, request, pk=None):
-        pass
-
     @swagger_auto_schema(request_body=UpdateBlockSerializer(), responses={200: BlockSerializer()})
     def partial_update(self, request, pkr, pk):
         """
@@ -53,5 +50,16 @@ class BlockViewSet(viewsets.ViewSet):
         block = serializer.save()
         return Response(BlockSerializer(block).data, status=status.HTTP_200_OK)
 
-    def destroy(self, request, pk=None):
-        pass
+    @swagger_auto_schema(responses={204: ''})
+    def destroy(self, request, pkr, pk):
+        """
+        Удаление блока.
+        """
+        road = get_object_or_404(Road, pk=pkr)
+        block = get_object_or_404(Block, pk=pk)
+        self.check_object_permissions(request, road)
+        line = read_road(road)
+        if block not in line:
+            raise serializers.ValidationError({'detail': ' Блок вне линии повествования.'})
+        delete_block(road, line, block)
+        return Response(status=status.HTTP_204_NO_CONTENT)

@@ -72,3 +72,10 @@ class BlockSerializer(serializers.ModelSerializer):
     class Meta:
         model = Block
         fields = ['id', 'content']
+
+
+class FullBlockSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Block
+        fields = '__all__'

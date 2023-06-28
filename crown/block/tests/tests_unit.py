@@ -8,7 +8,7 @@ from user.models import User
 from page.models import Page
 from road.models import Road
 
-from block.controller import read_road, create_block, update_block_content
+from block.controller import read_road, create_block, update_block_content, delete_block
 
 
 
@@ -163,3 +163,36 @@ class TestBlock(APITestCase):
         assert len(new_line) == len(fin_line)
         assert [i.id for i in new_line] == fin_line
         draw_blocks_graph(f'update_block_{block.id}_on_road_{road.id}')
+
+    @parameterized.expand([
+        (1, 1, -1, [2, 3, 4, 5, 6, 7]),
+        (1, 2, -1, [1, 3, 4, 5, 6, 7]),
+        (1, 3, 1, [1, 2, 4, 5, 6, 7]),
+        (4, 3, 0, [13, 14, 4, 5, 6, 7]),
+        (4, 14, -1, [13, 3, 4, 5, 6, 7]),
+        (2, 8, 1, [1, 2, 3, 22, 23, 7]),
+        (5, 15, 1, [23, 5, 6, 16]),
+        (7, 20, 1, [17, 18, 15, 22, 23, 16, 19]),
+        #  --------------------------------------
+        (7, 4, 0, [17, 18, 15, 20, 6, 16, 19]),
+        (6, 4, 3, [17, 18, 23, 24, 6, 16, 19]),
+        (5, 4, 1, [15, 5, 6, 16]),
+        (2, 4, 0, [1, 2, 3, 8, 6, 7]),
+        (1, 4, 1, [1, 2, 3, 5, 6, 7]),
+        #  --------------------------------------
+        (7, 6, 0, [17, 18, 15, 4, 20, 16, 19]),
+        (6, 6, 3, [17, 18, 15, 4, 23, 24, 19]),
+        (5, 6, 1, [15, 4, 5, 16]),
+        (2, 6, 0, [1, 2, 3, 4, 8, 7]),
+        (1, 6, 1, [1, 2, 3, 4, 5, 7]),
+    ])
+    def test_delete_block(self, rd, bl, c, fin_line):
+        block = Block.objects.get(pk=bl)
+        road = Road.objects.get(pk=rd)
+        line = read_road(road)
+        delete_block(road, line, block)
+        new_line = read_road(road)
+        assert Block.objects.count() == self.count + c
+        assert len(new_line) == len(fin_line)
+        assert [i.id for i in new_line] == fin_line
+        draw_blocks_graph(f'delete_block_{bl}_on_road_{rd}')

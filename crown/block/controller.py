@@ -1,4 +1,5 @@
 from .models import Block
+from road.models import Road
 
 
 def read_road(road):
@@ -161,3 +162,214 @@ def _create_connect_with_new_block(new_block, old_block, road):
             b.next_blocks.add(new_block)
             #logging.info(f"Добавлена связь {b} -> {new_block}")
             print(f"Добавлена связь {b} -> {new_block}")
+
+
+def delete_block(road, line, block):
+    list_roads_id_of_next_blocks = list(Block.objects.filter(next_blocks__in=[block]).values_list('road', flat=True))  # Список дорог, к которым относятся следующие блоки
+    list_roads_id_of_pre_blocks = list(block.next_blocks.all().values_list('road', flat=True))  # Список дорог, к которым относятся предыдущие блоки
+    roads_list = list(set(list_roads_id_of_next_blocks + list_roads_id_of_pre_blocks)) # Список дорог, к которым относятся связанные с удаляемым блоки
+
+    roads = []
+    for i in roads_list:
+        roads.append(Road.objects.get(pk=i))
+
+    print('Все дороги', roads)
+    if road in roads:
+        roads.remove(road)
+    print('Убрали целевую', roads)
+    r = roads.copy()
+    for i in roads:
+        #  Убрали кузенов
+        #if not (_check_paternity(get_road(i), road) or _check_paternity(road, get_road(i))) and i in r:
+        if i not in list(road.get_family()) and i in r:
+            r.remove(i)
+    roads = r.copy()
+    print('Убрали кузенов', roads)
+    # Удаляет из списка дорог предков целевой дороги
+    for i in roads:
+        #if _check_paternity(get_road(i), road) and i in r:
+        if road in list(i.get_descendants()) and i in r:
+            r.remove(i)
+    roads = r.copy()
+    print('Убрали предков', roads)
+    for i in roads:
+        for j in roads:
+            if i != j:
+                #  Убирает внуков целевой дороги
+                #if _check_paternity(get_road(i), get_road(j)) and j in r:
+                if j in list(i.get_descendants()) and j in r:
+                    r.remove(j)
+    roads = r.copy()
+    print('Убрали внуков', roads)
+
+    for r_i in roads:
+        r_line = read_road(r_i)
+        pre_block, next_block = _get_neighbours(r_line, block)
+        #road_i = get_road(r_i)
+        pre_block, next_block = _pre_n_next_blocks_move(r_i, r_line, pre_block, block, next_block)
+        _new_pre_n_new_next_blocks_move(r_i, pre_block, block, next_block)
+
+    pre_block, next_block = _get_neighbours(line, block)
+    pre_block, next_block = _pre_n_next_blocks_move(road, line, pre_block, block, next_block)
+    if block.road == road:
+        block.delete()
+    return [pre_block, next_block]
+
+
+def _pre_n_next_blocks_move(road, line, pre_block, block, next_block):
+    pre_block_cr = pre_block
+    next_block_cr = next_block
+    if block.road == road:  # Если блок, который перемещают с моей дороги
+        if pre_block and next_block:  # Если существуют предыдущий и следующий блоки
+            #_cut_pre_my_next(road, pre_block, block, next_block)
+            pre_block.next_blocks.remove(block)
+            print(f"Удалена связь {pre_block} -> {block}")
+            block.next_blocks.remove(next_block)
+            print(f"Удалена связь {block} -> {next_block}")
+            if pre_block.road != road and next_block.road != road:  # Если и предыдущий и следующий не с моей дороги
+                if not Block.objects.filter(id=pre_block.id, next_blocks__in=[next_block]).exists():  # Если предыдущий и следующий блоки НЕ связаны, то есть между ними на родительских дорогах есть промежуточные блоки
+                    pre_block_cr, next_block_cr = _cut_not_my_pre_block_not_my_next(road, line, pre_block, next_block)
+            else:
+                pre_block.next_blocks.add(next_block)
+                print(f"Добавлена связь {pre_block} -> {next_block}")
+        elif not pre_block:  # Если нет предыдущего блока, то есть block - это начало
+            block.next_blocks.remove(next_block)
+            print(f"Удалена связь {block} -> {next_block}")
+            block.is_start = False
+            block.save()
+            print(f"Для блока {block} is_start установлено в False")
+            if next_block.road != road:  # Если следующий блок не с моей дороги
+                next_block_cr = Block.objects.create(road=road, is_start=True, content=next_block.content)
+                print(f"Блок {next_block} скопирован в блок {next_block_cr}")
+                if line.index(next_block) < len(line) - 1:  # Если следующий блок не последний в линии повествования
+                    next_block_cr.next_blocks.add(line[line.index(next_block) + 1])
+                    print(f"Добавлена связь {next_block_cr} -> {line[line.index(next_block) + 1]}")
+            else:
+                next_block.is_start = True
+                next_block.save()
+                print(f"Для блока {next_block} is_start установлено в True")
+        elif not next_block:  # Если нет следующего блока, то есть block - это конец
+            pre_block.next_blocks.remove(block)
+            print(f"Удалена связь {pre_block} -> {block}")
+    else:  # Блок, который перемещают НЕ с моей дороги
+        if pre_block and next_block:  # Если существуют предыдущий и следующий блоки
+            if pre_block.road != road and next_block.road != road:  # Если и предыдущий, и следующий НЕ с моей дороги
+                pre_block_cr, next_block_cr = _cut_not_my_pre_block_not_my_next(road, line, pre_block, next_block)
+            else:  # Предыдущий или следующий блок с моей дороги
+                pre_block.next_blocks.add(next_block)
+                print(f"Добавлена связь {pre_block} -> {next_block}")
+                if pre_block.road == road:  # Если предыдущий блок с моей дороги
+                    pre_block.next_blocks.remove(block)
+                    print(f"Удалена связь {pre_block} -> {block}")
+                if next_block.road == road:  # Если следующий блок с моей дороги
+                    block.next_blocks.remove(next_block)
+                    print(f"Удалена связь {block} -> {next_block}")
+        elif not pre_block:  # Если нет предыдущего блока, то есть block - это начало
+            if next_block.road != road:  # Если следующий блок HE с моей дороги
+                next_block_cr = Block.objects.create(road=road, is_start=True, content=next_block.content)
+                print(f"Блок {next_block} скопирован в блок {next_block_cr}")
+                if line.index(next_block) < len(line) - 1:  # Если следующий блок не последний в линии повествования
+                    next_block_cr.next_blocks.add(line[line.index(next_block) + 1])
+                    print(f"Добавлена связь {next_block_cr} -> {line[line.index(next_block) + 1]}")
+                    if line[line.index(next_block) + 1].road == road:  # Если следующий за слудующим с моей дороги
+                        next_block.next_blocks.remove(line[line.index(next_block) + 1])
+                        print(f"Удалена связь {next_block} -> {line[line.index(next_block) + 1]}")
+            else:  # следующий блок с моей дороги
+                block.next_blocks.remove(next_block)
+                print(f"Удалена связь {block} -> {next_block}")
+                next_block.is_start = True
+                next_block.save()
+                print(f"Для блока {next_block} is_start установлено в True")
+        elif not next_block:
+            if pre_block.road != road:  # Если предыдущий блок не с моей дороги
+                pre_block_cr = Block.objects.create(road=road, content=pre_block.content)
+                print(f"Блок {pre_block} скопирован в блок {pre_block_cr}")
+                if line.index(pre_block) == 0:  # Если пред. блок - начало линии
+                    pre_block_cr.is_start = True
+                    pre_block_cr.save()
+                    print(f"Для блока {pre_block_cr} is_start установлено в True")
+                else:  # Если пред. блок - НЕ начало линии
+                    line[line.index(pre_block) - 1].next_blocks.add(pre_block_cr)
+                    print(f"Добавлена связь {line[line.index(pre_block) - 1]} -> {pre_block_cr}")
+                    if line[line.index(pre_block) - 1].road == road:  # Если пред-предыдущий блок с моей дороги
+                        line[line.index(pre_block) - 1].next_blocks.remove(pre_block)
+                        print(f"Удалена связь {line[line.index(pre_block) - 1]} -> {pre_block}")
+            else:  # предыдущий блок с моей дороги
+                pre_block.next_blocks.remove(block)
+                print(f"Удалена связь {pre_block} -> {block}")
+
+    if pre_block != pre_block_cr:
+        _create_connect_with_new_block(pre_block_cr, pre_block, road)
+    if next_block != next_block_cr:
+        _create_connect_with_new_block(next_block_cr, next_block, road)
+
+    return pre_block_cr, next_block_cr
+
+
+def _cut_not_my_pre_block_not_my_next(road, line, pre_block, next_block):
+    pre_block_cr = Block.objects.create(road=road, content=pre_block.content)
+    #logging.info(f"Блок {pre_block} скопирован в блок {pre_block_cr}")
+    print(f"Блок {pre_block} скопирован в блок {pre_block_cr}")
+    if line.index(pre_block) == 0:  # Если предыдущий блок - начало линии
+        pre_block_cr.is_start = True
+        pre_block_cr.save()
+        #logging.info(f"Для блока {pre_block_cr} is_start установлено в True")
+    else:  # Если предыдущий блок НЕ начало линии
+        line[line.index(pre_block) - 1].next_blocks.add(pre_block_cr)
+        #logging.info(f"Добавлена связь {line[line.index(pre_block) - 1]} -> {pre_block_cr}")
+        print(f"Добавлена связь {line[line.index(pre_block) - 1]} -> {pre_block_cr}")
+        if line[line.index(pre_block) - 1].road == road:  # Если пред-предыдущий блок с моей дороги
+            line[line.index(pre_block) - 1].next_blocks.remove(pre_block)
+            #logging.info(f"Удалена связь {line[line.index(pre_block) - 1]} -> {pre_block}")
+            print(f"Удалена связь {line[line.index(pre_block) - 1]} -> {pre_block}")
+    next_block_cr = Block.objects.create(road=road, content=next_block.content)
+    #logging.info(f"Блок {next_block} скопирован в блок {next_block_cr}")
+    print(f"Блок {next_block} скопирован в блок {next_block_cr}")
+    if line.index(next_block) < len(line) - 1:  # Если следующий блок не последний в линии повествования
+        next_block_cr.next_blocks.add(line[line.index(next_block) + 1])
+        #logging.info(f"Добавлена связь {next_block_cr} -> {line[line.index(next_block) + 1]}")
+        print(f"Добавлена связь {next_block_cr} -> {line[line.index(next_block) + 1]}")
+        if line[line.index(next_block) + 1].road == road:  # Если следующий за слeдующим с моей дороги
+            next_block.next_blocks.remove(line[line.index(next_block) + 1])
+            #logging.info(f"Удалена связь {next_block} -> {line[line.index(next_block) + 1]}")
+            print(f"Удалена связь {next_block} -> {line[line.index(next_block) + 1]}")
+    pre_block_cr.next_blocks.add(next_block_cr)
+    #logging.info(f"Добавлена связь {pre_block_cr} -> {next_block_cr}")
+    print(f"Добавлена связь {pre_block_cr} -> {next_block_cr}")
+    return pre_block_cr, next_block_cr
+
+
+def _new_pre_n_new_next_blocks_move(road, new_pre_block, block, new_next_block):
+    i_d = block.id
+    if block.road != road:  # Блок, который перемещают HE с моей дороги
+        block = Block.objects.create(road=road, content=block.content, is_start=block.is_start)
+        print(f"Блок {i_d} скопирован в блок {block}")
+        _create_connect_with_new_block(block, Block.objects.get(pk=i_d), road)
+
+    if block.road == road:  # Блок, который перемещают с моей дороги
+        if new_pre_block and new_next_block:  # Если сществуют и предыдущий и следующий блоки
+            new_pre_block.next_blocks.add(block)
+            print(f"Добавлена связь {new_pre_block} -> {block}")
+            block.next_blocks.add(new_next_block)
+            print(f"Добавлена связь {block} -> {new_next_block}")
+            if new_pre_block.road != road and new_next_block.road != road:  # Если и предыдущий и следующий не с моей дороги
+                pass
+            else:
+                new_pre_block.next_blocks.remove(new_next_block)
+                print(f"Удалена связь {new_pre_block} -> {new_next_block}")
+        elif not new_pre_block:  # Если нет предыдущего блока (то есть block - это новое начало)
+            block.next_blocks.add(new_next_block)
+            print(f"Добавлена связь {block} -> {new_next_block}")
+            block.is_start = True
+            block.save()
+            print(f"Для блока {block} is_start установлено в True")
+            if new_next_block.road != road:  # Если след.блок не с моей дороги
+                pass
+            else:
+                new_next_block.is_start = False
+                new_next_block.save()
+                print(f"Для блока {new_next_block} is_start установлено в False")
+        elif not new_next_block:  # Если нет следующего блока (то есть block - это конец)
+            new_pre_block.next_blocks.add(block)
+            print(f"Добавлена связь {new_pre_block} -> {block}")
+    return block
