@@ -1,0 +1,8 @@
+1: <QuerySet [(1, 0)]>, <QuerySet [(2, 1)]>, <QuerySet [(3, 2)]>, <QuerySet [(4, 3)]>, <QuerySet [(5, 4)]>, <QuerySet [(6, 5)]>, <QuerySet [(7, 6)]>, 
+2: <QuerySet [(1, 0)]>, <QuerySet [(2, 1)]>, <QuerySet [(3, 2)]>, <QuerySet [(4, 3)]>, <QuerySet [(8, 4)]>, <QuerySet [(6, 5)]>, <QuerySet [(7, 6)]>, 
+3: <QuerySet [(1, 0)]>, <QuerySet [(2, 1)]>, <QuerySet [(3, 2)]>, <QuerySet [(9, 3)]>, <QuerySet [(10, 4)]>, <QuerySet [(11, 5)]>, <QuerySet [(12, 6)]>, 
+4: <QuerySet [(13, 0)]>, <QuerySet [(14, 1)]>, <QuerySet [(3, 2)]>, <QuerySet [(4, 3)]>, <QuerySet [(5, 4)]>, <QuerySet [(6, 5)]>, <QuerySet [(7, 6)]>, 
+5: <QuerySet [(15, 0)]>, <QuerySet [(4, 1)]>, <QuerySet [(5, 2)]>, <QuerySet [(6, 3)]>, <QuerySet [(16, 4)]>, 
+6: <QuerySet [(17, 0)]>, <QuerySet [(18, 1)]>, <QuerySet [(15, 2)]>, <QuerySet [(4, 3)]>, <QuerySet [(5, 4)]>, <QuerySet [(6, 5)]>, <QuerySet [(16, 6)]>, <QuerySet [(19, 7)]>, 
+7: <QuerySet [(17, 0)]>, <QuerySet [(18, 1)]>, <QuerySet [(22, 2)]>, <QuerySet [(15, 3)]>, <QuerySet [(4, 4)]>, <QuerySet [(20, 5)]>, <QuerySet [(6, 6)]>, <QuerySet [(16, 7)]>, <QuerySet [(19, 8)]>, 
+8: <QuerySet [(21, 0)]>, 

@@ -7,6 +7,8 @@ from .models import Road
 from crown.validators import check_public_or_author
 from page.serializers import DefaultPageSerializer, ShortPageSerializer
 from user.serializers import UserShortSerializer
+from block.controller import read_road
+from block.models import BlocksOnRoad
 
 
 class CreateRoadSerializer(serializers.ModelSerializer):
@@ -18,7 +20,11 @@ class CreateRoadSerializer(serializers.ModelSerializer):
         fields = ['title', 'parent']
 
     def create(self, validated_data):
-        return Road.objects.create(**validated_data, page=validated_data['parent'].page)
+        road = Road.objects.create(**validated_data, page=validated_data['parent'].page)
+        line = read_road(validated_data['parent'])
+        for block in line:
+            BlocksOnRoad.objects.create(block=block, road=road, index=line.index(block))
+        return road
 
     def validate_parent(self, value):
         try:

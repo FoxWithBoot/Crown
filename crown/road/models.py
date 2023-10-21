@@ -34,8 +34,9 @@ class Road(MPTTModel, AbstractAuthorsObj):
     def post_create(cls, sender, instance, created, *args, **kwargs):
         """При создании новой корневой дороги (ветки) создается блок на этой дороге."""
         if created and not instance.parent:
-            from block.models import Block
-            Block.objects.create(road=instance, is_start=True, content="<p>Давай начнем писать;)</p>")
+            from block.models import Block, BlocksOnRoad
+            block = Block.objects.create(content="<p>Давай начнем писать;)</p>")
+            BlocksOnRoad.objects.create(block=block, road=instance, original_road=True, index=0)
 
     def change_public_state(self, is_public):
         if is_public:
